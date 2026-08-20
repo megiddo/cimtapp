@@ -17,6 +17,11 @@ use App\Domain\Auth\SystemClock;
 use App\Domain\Auth\UserProvisioner;
 use App\Domain\Auth\UserStorePort;
 use App\Domain\Crypto\Crypto;
+use App\Domain\Dose\CompoundService;
+use App\Domain\Dose\DoseCalculator;
+use App\Domain\Dose\PeptideCatalog;
+use App\Domain\Dose\SyringeService;
+use App\Domain\Dose\UseService;
 use App\Infrastructure\Http\FileGetContentsHttpTransport;
 use App\Infrastructure\Http\HttpGoogleOAuthClient;
 use App\Infrastructure\Http\HttpTransport;
@@ -92,6 +97,28 @@ return function (ContainerBuilder $containerBuilder): void {
         IdGenerator::class => static fn (): IdGenerator => new IdGenerator(),
         EmailNormalizer::class => static fn (): EmailNormalizer => new EmailNormalizer(),
         CredentialParser::class => static fn (): CredentialParser => new CredentialParser(),
+        DoseCalculator::class => static fn (): DoseCalculator => new DoseCalculator(),
+        SyringeService::class => static function (ContainerInterface $c): SyringeService {
+            return new SyringeService($c->get(IdGenerator::class));
+        },
+        CompoundService::class => static function (ContainerInterface $c): CompoundService {
+            return new CompoundService(
+                $c->get(DoseCalculator::class),
+                $c->get(PeptideCatalog::class),
+                $c->get(SyringeService::class),
+                $c->get(IdGenerator::class),
+                $c->get(Clock::class),
+            );
+        },
+        UseService::class => static function (ContainerInterface $c): UseService {
+            return new UseService(
+                $c->get(DoseCalculator::class),
+                $c->get(CompoundService::class),
+                $c->get(SyringeService::class),
+                $c->get(IdGenerator::class),
+                $c->get(Clock::class),
+            );
+        },
         PasswordHasher::class => static function (ContainerInterface $c): PasswordHasher {
             $settings = $c->get(SettingsInterface::class);
 

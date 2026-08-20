@@ -37,7 +37,8 @@ class HttpErrorHandler extends SlimErrorHandler
             $error = new ActionError(
                 ActionError::VALIDATION_ERROR,
                 $exception->getMessage(),
-                $exception->fields()
+                $exception->fields(),
+                $exception->remainingIu(),
             );
         } elseif ($exception instanceof AuthenticationException) {
             $statusCode = 401;

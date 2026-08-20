@@ -26,14 +26,21 @@ class ActionError implements JsonSerializable
     /** @var array<string, list<string>>|null */
     private ?array $fields;
 
+    private ?float $remainingIu;
+
     /**
      * @param array<string, list<string>>|null $fields
      */
-    public function __construct(string $type, ?string $description = null, ?array $fields = null)
-    {
+    public function __construct(
+        string $type,
+        ?string $description = null,
+        ?array $fields = null,
+        ?float $remainingIu = null,
+    ) {
         $this->type = $type;
         $this->description = $description;
         $this->fields = $fields;
+        $this->remainingIu = $remainingIu;
     }
 
     public function getType(): string
@@ -78,8 +85,25 @@ class ActionError implements JsonSerializable
         return $this;
     }
 
+    public function getRemainingIu(): ?float
+    {
+        return $this->remainingIu;
+    }
+
+    public function setRemainingIu(?float $remainingIu): self
+    {
+        $this->remainingIu = $remainingIu;
+
+        return $this;
+    }
+
     /**
-     * @return array{type: string, description: ?string, fields?: array<string, list<string>>}
+     * @return array{
+     *     type: string,
+     *     description: ?string,
+     *     fields?: array<string, list<string>>,
+     *     remaining_iu?: float
+     * }
      */
     public function jsonSerialize(): array
     {
@@ -89,6 +113,9 @@ class ActionError implements JsonSerializable
         ];
         if ($this->fields !== null) {
             $payload['fields'] = $this->fields;
+        }
+        if ($this->remainingIu !== null) {
+            $payload['remaining_iu'] = $this->remainingIu;
         }
 
         return $payload;

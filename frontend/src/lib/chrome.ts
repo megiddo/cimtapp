@@ -38,11 +38,17 @@ export function titleForPath(pathname: string): string {
   if (pathname === '/') {
     return 'Home';
   }
+  if (pathname === '/inventory/new') {
+    return 'Mix';
+  }
   if (pathname === '/use/new' || pathname.startsWith('/use/')) {
     return 'Log';
   }
   if (pathname === '/inventory' || pathname.startsWith('/inventory/')) {
     return 'Vials';
+  }
+  if (/^\/history\/[^/]+$/.test(pathname)) {
+    return 'Edit';
   }
   if (pathname === '/history' || pathname.startsWith('/history/')) {
     return 'History';
@@ -55,6 +61,26 @@ export function titleForPath(pathname: string): string {
   }
 
   return 'CIMTapp';
+}
+
+export function backHrefForPath(pathname: string): string | null {
+  if (pathname === '/inventory/new') {
+    return '/inventory';
+  }
+  if (/^\/history\/[^/]+$/.test(pathname)) {
+    return '/history';
+  }
+
+  return null;
+}
+
+export function needsStickyCta(pathname: string): boolean {
+  return (
+    pathname === '/use/new' ||
+    pathname === '/inventory' ||
+    pathname === '/inventory/new' ||
+    /^\/history\/[^/]+$/.test(pathname)
+  );
 }
 
 export function emphasizedTabFrom(tabs: readonly NavTab[]): NavTab {

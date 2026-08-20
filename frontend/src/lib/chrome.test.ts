@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   CONTENT_MAX_PX,
   DESIGN_FLOOR_PX,
+  backHrefForPath,
   emphasizedTab,
   emphasizedTabFrom,
   isTabActive,
   MIN_TAP_PX,
   NAV_TABS,
+  needsStickyCta,
   showsSettingsLink,
   showsTabBar,
   titleForPath
@@ -82,13 +84,34 @@ describe('titleForPath', () => {
     expect(titleForPath('/use/new')).toBe('Log');
     expect(titleForPath('/use/123')).toBe('Log');
     expect(titleForPath('/inventory')).toBe('Vials');
-    expect(titleForPath('/inventory/new')).toBe('Vials');
+    expect(titleForPath('/inventory/new')).toBe('Mix');
     expect(titleForPath('/history')).toBe('History');
-    expect(titleForPath('/history/1')).toBe('History');
+    expect(titleForPath('/history/1')).toBe('Edit');
     expect(titleForPath('/login')).toBe('Sign in');
     expect(titleForPath('/login/x')).toBe('Sign in');
     expect(titleForPath('/settings')).toBe('Settings');
     expect(titleForPath('/settings/syringes')).toBe('Settings');
     expect(titleForPath('/unknown')).toBe('CIMTapp');
+  });
+});
+
+describe('backHrefForPath', () => {
+  it('returns a chevron target for mix and edit only', () => {
+    expect(backHrefForPath('/inventory/new')).toBe('/inventory');
+    expect(backHrefForPath('/history/abc')).toBe('/history');
+    expect(backHrefForPath('/history')).toBeNull();
+    expect(backHrefForPath('/inventory')).toBeNull();
+    expect(backHrefForPath('/')).toBeNull();
+  });
+});
+
+describe('needsStickyCta', () => {
+  it('is true on log, mix, inventory, and edit', () => {
+    expect(needsStickyCta('/use/new')).toBe(true);
+    expect(needsStickyCta('/inventory')).toBe(true);
+    expect(needsStickyCta('/inventory/new')).toBe(true);
+    expect(needsStickyCta('/history/abc')).toBe(true);
+    expect(needsStickyCta('/history')).toBe(false);
+    expect(needsStickyCta('/')).toBe(false);
   });
 });

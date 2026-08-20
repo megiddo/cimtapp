@@ -4,6 +4,7 @@ export type ActionErrorBody = {
   type: string;
   description: string | null;
   fields?: FieldMap;
+  remaining_iu?: number;
 };
 
 export type ActionPayload<T> = {
@@ -38,6 +39,9 @@ export function parseActionPayload<T>(value: unknown, httpStatus = 200): ActionP
     };
     if (payload.error.fields === undefined) {
       delete payload.error.fields;
+    }
+    if (typeof value.error.remaining_iu === 'number' && Number.isFinite(value.error.remaining_iu)) {
+      payload.error.remaining_iu = value.error.remaining_iu;
     }
   }
 

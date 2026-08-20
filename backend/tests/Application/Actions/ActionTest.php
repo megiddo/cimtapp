@@ -160,5 +160,15 @@ class ActionTest extends TestCase
         $this->assertSame(['password' => ['too short']], $error->getFields());
         $error->setFields(null);
         $this->assertArrayNotHasKey('fields', $error->jsonSerialize());
+
+        $this->assertNull($error->getRemainingIu());
+        $error->setRemainingIu(175.0);
+        $this->assertSame(175.0, $error->getRemainingIu());
+        $this->assertSame(175.0, $error->jsonSerialize()['remaining_iu']);
+        $error->setRemainingIu(0.0);
+        $this->assertArrayHasKey('remaining_iu', $error->jsonSerialize());
+        $this->assertSame(0.0, $error->jsonSerialize()['remaining_iu']);
+        $error->setRemainingIu(null);
+        $this->assertArrayNotHasKey('remaining_iu', $error->jsonSerialize());
     }
 }

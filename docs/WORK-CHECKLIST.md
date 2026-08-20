@@ -1,6 +1,6 @@
 # CIMTapp work checklist
 
-Implementation-sized items from the design plan. Framework (this branch) marks scaffolding done; domain stays pending.
+Implementation-sized items from the design plan. Framework (this branch) marks scaffolding done; P2 domain is checked off.
 
 ## Testing gates
 
@@ -41,14 +41,14 @@ Gate: register, password login, and Google login (verified email) all produce a 
 
 Gate: mix a vial, log a use in IU, see mg and remainder, edit the use, and get a newest-first history. Overdraw returns 422.
 
-- [ ] `DoseCalculator` domain service + unit tests for U-100 and non-U-100 syringes
-- [ ] `GET /peptide-types`; `GET/POST /compounds`; `GET /compounds/current` with computed remainder
-- [ ] Compound immutability after first use (mg and BAC locked)
-- [ ] Syringe CRUD; seed default 0.5 mL / 50 IU; snapshot syringe onto each use
-- [ ] `POST /uses` against current compound; store iu, volume_ml, peptide_mg; reject overdraw
-- [ ] `GET /uses` used_at DESC; `PATCH /uses` recalculates mg and re-checks remainder
-- [ ] SPA: mix as full-screen form, inventory cards, log-use with thumb stepper + sticky Save, history 56px rows grouped by day
-- [ ] Home remainder hero wired to `/compounds/current` (mg, mL, IU at default syringe)
+- [x] `DoseCalculator` domain service + unit tests for U-100 and non-U-100 syringes
+- [x] `GET /peptide-types`; `GET/POST /compounds`; `GET /compounds/current` with computed remainder
+- [x] Compound immutability after first use (mg and BAC locked)
+- [x] Syringe CRUD; seed default 0.5 mL / 50 IU; snapshot syringe onto each use
+- [x] `POST /uses` against current compound; store iu, volume_ml, peptide_mg; reject overdraw
+- [x] `GET /uses` used_at DESC; `PATCH /uses` recalculates mg and re-checks remainder
+- [x] SPA: mix as full-screen form, inventory cards, log-use with thumb stepper + sticky Save, history 56px rows grouped by day
+- [x] Home remainder hero wired to `/compounds/current` (mg, mL, IU at default syringe)
 
 ## Phase 3 — UX finish + hardening
 

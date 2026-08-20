@@ -3,7 +3,9 @@
   import '../app.css';
   import {
     NAV_TABS,
+    backHrefForPath,
     isTabActive,
+    needsStickyCta,
     showsSettingsLink,
     showsTabBar,
     titleForPath
@@ -15,17 +17,22 @@
   const tabsVisible = $derived(showsTabBar(pathname));
   const title = $derived(titleForPath(pathname));
   const settingsVisible = $derived(showsSettingsLink(pathname));
+  const backHref = $derived(backHrefForPath(pathname));
+  const sticky = $derived(needsStickyCta(pathname));
 </script>
 
 <div class="app-shell" class:with-tabs={tabsVisible}>
   <header class="top-bar">
+    {#if backHref}
+      <a class="back" href={backHref} aria-label="Back">‹</a>
+    {/if}
     <h1>{title}</h1>
     {#if settingsVisible}
       <a class="gear" href="/settings" aria-label="Settings">Settings</a>
     {/if}
   </header>
 
-  <main>
+  <main class:has-sticky={sticky}>
     {@render children()}
   </main>
 

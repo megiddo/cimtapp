@@ -98,7 +98,21 @@ Validation errors: **422** with a field map on `error.fields`. Unauthenticated: 
 }
 ```
 
-Success bodies stay `{ "statusCode": 201, "data": { ... } }`. `GET /me` data is `{ email, has_password, has_google, remainder }` — `remainder` is `null` until Phase 2. DEK / nonce / ciphertext never appear.
+Success bodies stay `{ "statusCode": 201, "data": { ... } }`. `GET /me` data is `{ email, has_password, has_google, remainder }`. `remainder` is `null` until a vial exists, then:
+
+```json
+{
+  "compound_id": "…",
+  "peptide_name": "Tirzepatide",
+  "remaining_mg": 8.75,
+  "remaining_ml": 1.75,
+  "remaining_iu": 175,
+  "concentration": 5,
+  "compounded_at": "2026-08-20T12:00"
+}
+```
+
+`remaining_iu` on `/me` and `GET /compounds/current` uses the **default syringe**. DEK / nonce / ciphertext never appear.
 
 | Method | Path | Role |
 | --- | --- | --- |
@@ -110,15 +124,36 @@ Success bodies stay `{ "statusCode": 201, "data": { ... } }`. `GET /me` data is 
 | GET | `/auth/google/callback` | exchange code, set cookie, 302 to `/` |
 | GET | `/me` | identity + remainder summary (auth) |
 | POST | `/me/password` | set or change password (auth) |
-| GET | `/peptide-types` | global catalog |
-| GET/POST | `/syringes` | list / create |
-| PATCH | `/syringes/{id}` | label, default flag |
-| GET/POST | `/compounds` | inventory / mix |
-| GET | `/compounds/current` | latest mix + remainder |
-| GET/POST | `/uses` | list desc / log |
-| PATCH | `/uses/{id}` | iu, syringe, used_at, notes |
+| GET | `/peptide-types` | global catalog, active only, `sort_order` (`id` = slug) |
+| GET/POST | `/syringes` | list / create (`volume_ml` > 0, `capacity_iu` > 0; auto label `0.5 mL / 50 IU` if omitted; exactly one `is_default`) |
+| PATCH | `/syringes/{id}` | label and/or default flag (setting default unsets others) |
+| GET/POST | `/compounds` | inventory (`compounded_at DESC`, includes remaining) / mix |
+| GET | `/compounds/current` | latest `compounded_at` + remainder at default syringe. **404** when no vial (SPA treats empty) |
+| GET | `/compounds/{id}` | one mix + remainder |
+| PATCH | `/compounds/{id}` | notes + `compounded_at` always; mg/BAC/type only before first use |
+| GET/POST | `/uses` | list `used_at DESC, id DESC` / log against current (or `compound_id`) |
+| PATCH | `/uses/{id}` | iu, syringe, used_at, notes; recalc mg; re-check remainder (original use put back first) |
+| GET | `/uses/{id}` | one use |
 
-`GET /uses?before=iso&limit=50`. Default order `used_at DESC, id DESC`.
+`GET /uses?before=iso&limit=50`. Default limit 50, cap 100. `before` is exclusive on `used_at`. POST `/uses` snapshots syringe onto the row. Default syringe for a new use: last-used if that profile still exists, else the default syringe. Edits keep the original vial.
+
+Overdraw is **422** with the usual field map **and** `remaining_iu` on the error object (IU remaining at the syringe on this request):
+
+```json
+{
+  "statusCode": 422,
+  "error": {
+    "type": "VALIDATION_ERROR",
+    "description": "25 IU exceeds 18 IU remaining in this vial.",
+    "fields": {
+      "iu": ["25 IU exceeds 18 IU remaining in this vial."]
+    },
+    "remaining_iu": 18
+  }
+}
+```
+
+No vial yet → POST `/uses` 422 `{ "compound_id": ["Mix a vial before logging a use."] }`.
 
 ## Dose formulas
 
@@ -135,7 +170,7 @@ remaining_iu  = remaining_ml / (syringe_volume_ml / syringe_capacity_iu)
 
 Worked example: tirzepatide 10 mg in 2.0 mL BAC, syringe 0.5 mL / 50 IU, dose 25 IU → 5.00 mg/mL, 0.010 mL/IU, 0.25 mL, 1.25 mg, remainder 8.75 mg / 1.75 mL / 175 IU.
 
-Rules: IU allows one decimal, reject `<= 0`. Overdraw → 422 with `remaining_iu`. Store mg at 4 decimal places; display 2–3. No compound yet → log use disabled.
+Rules: IU allows one decimal, reject `<= 0`. Store mg at 4 decimal places; display 2–3. Overdraw → 422 with `error.remaining_iu` plus `error.fields.iu`. When **editing** a use, remainder check excludes that use’s `peptide_mg` (puts it back) before applying the new IU. No compound yet → log use 422 pointing at mix-a-vial. Active compound = latest `compounded_at`, not `created_at`. After any uses, `peptide_mg` and `bac_water_ml` (and type) cannot change.
 
 ## Mobile-first UI
 

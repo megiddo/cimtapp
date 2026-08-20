@@ -64,6 +64,15 @@ class AuthDomainTest extends TestCase
         $this->assertSame($challenge, $ids->pkceChallenge($verifier));
     }
 
+    public function testRemainingIuIsOptionalOnValidationException(): void
+    {
+        $plain = new ValidationException(['email' => ['taken']]);
+        $this->assertNull($plain->remainingIu());
+        $over = new ValidationException(['iu' => ['nope']], 'nope', 18.5);
+        $this->assertSame(18.5, $over->remainingIu());
+        $this->assertSame('nope', $over->getMessage());
+    }
+
     public function testUserMeArrayOmitsSecrets(): void
     {
         $user = new User('id', 'a@b.c', 'hash', 'sub', 'dek-cipher', 'nonce', 'now', null);

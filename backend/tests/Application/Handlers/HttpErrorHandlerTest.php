@@ -142,6 +142,28 @@ class HttpErrorHandlerTest extends TestCase
         $this->assertSame(422, $response->getStatusCode());
         $this->assertSame(ActionError::VALIDATION_ERROR, $payload['error']['type']);
         $this->assertSame(['email' => ['taken']], $payload['error']['fields']);
+        $this->assertArrayNotHasKey('remaining_iu', $payload['error']);
+    }
+
+    public function testValidationExceptionExposesRemainingIu(): void
+    {
+        $app = AppFactory::create();
+        $request = $this->createRequest('GET', '/x');
+        $handler = new HttpErrorHandler(
+            $app->getCallableResolver(),
+            $app->getResponseFactory(),
+            new NullLogger()
+        );
+        $exception = new \App\Domain\Auth\ValidationException(
+            ['iu' => ['25 IU exceeds 18 IU remaining in this vial.']],
+            '25 IU exceeds 18 IU remaining in this vial.',
+            18.0
+        );
+        $response = $handler($request, $exception, true, false, false);
+        $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertEqualsWithDelta(18.0, $payload['error']['remaining_iu'], 1e-9);
+        $this->assertSame(['iu' => ['25 IU exceeds 18 IU remaining in this vial.']], $payload['error']['fields']);
     }
 
     public function testAuthenticationExceptionIs401(): void

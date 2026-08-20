@@ -32,6 +32,25 @@ describe('parseActionPayload', () => {
     expect(firstFieldError({ password: [] }, 'password')).toBeNull();
   });
 
+  it('keeps remaining_iu on overdraw payloads', () => {
+    const payload = parseActionPayload({
+      statusCode: 422,
+      error: {
+        type: 'VALIDATION_ERROR',
+        description: '25 IU exceeds 18 IU remaining in this vial.',
+        fields: { iu: ['25 IU exceeds 18 IU remaining in this vial.'] },
+        remaining_iu: 18
+      }
+    });
+    expect(payload.error?.remaining_iu).toBe(18);
+    expect(
+      parseActionPayload({
+        statusCode: 422,
+        error: { type: 'VALIDATION_ERROR', description: 'nope', remaining_iu: '18' }
+      }).error?.remaining_iu
+    ).toBeUndefined();
+  });
+
   it('falls back to the HTTP status when statusCode is missing', () => {
     expect(parseActionPayload(null, 503).statusCode).toBe(503);
     expect(parseActionPayload('nope', 401).statusCode).toBe(401);

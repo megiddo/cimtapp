@@ -14,6 +14,7 @@ final class ValidationException extends DomainException
     public function __construct(
         private readonly array $fields,
         string $message = 'Validation failed.',
+        private readonly ?float $remainingIu = null,
     ) {
         parent::__construct($message);
     }
@@ -24,5 +25,10 @@ final class ValidationException extends DomainException
     public function fields(): array
     {
         return $this->fields;
+    }
+
+    public function remainingIu(): ?float
+    {
+        return $this->remainingIu;
     }
 }

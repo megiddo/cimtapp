@@ -67,6 +67,19 @@ button {
   font-size: 0.85rem;
 }
 
+.back {
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 1.75rem;
+  line-height: 1;
+  margin-left: -0.35rem;
+}
+
 main {
   box-sizing: border-box;
   flex: 1;
@@ -145,7 +158,8 @@ button.text {
   gap: 0.35rem;
 }
 
-.auth-form input {
+.auth-form input,
+.auth-form select {
   box-sizing: border-box;
   width: 100%;
   min-height: var(--tap-min);
@@ -206,4 +220,185 @@ button.text {
 .banner {
   margin-bottom: 0.85rem;
   color: #8a1f1f;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.hero .peptide {
+  font-weight: 650;
+}
+
+.hero .mg {
+  font-size: 2.4rem;
+  font-weight: 750;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.hero.warning .mg {
+  color: #8a5a10;
+}
+
+.hero.danger .mg {
+  color: #8a1f1f;
+}
+
+.hero .meta,
+.muted {
+  color: #555;
+  font-size: 0.95rem;
+}
+
+.tone {
+  font-size: 0.95rem;
+}
+
+.tone.warning {
+  color: #8a5a10;
+}
+
+.tone.danger {
+  color: #8a1f1f;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: 0 0.9rem;
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.95rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.row-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  box-sizing: border-box;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #e4e0d8;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.row .primary {
+  font-weight: 650;
+}
+
+.row .secondary {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card {
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  min-height: 56px;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 650;
+  vertical-align: middle;
+}
+
+.stepper {
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.stepper button {
+  min-height: 48px;
+  min-width: 48px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 1.4rem;
+}
+
+.preview {
+  margin: 0.75rem 0;
+  font-weight: 650;
+}
+
+.below-fold {
+  margin-top: 1.5rem;
+}
+
+.day-heading {
+  margin: 1rem 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: #555;
+}
+
+.sticky-cta {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--content-max);
+  box-sizing: border-box;
+  bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom));
+  padding: 0.5rem 1.25rem;
+  background: var(--paper);
+  z-index: 2;
+}
+
+.sticky-cta a,
+.sticky-cta button {
+  box-sizing: border-box;
+  min-height: var(--tap-min);
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.sticky-cta button:disabled {
+  opacity: 0.55;
+}
+
+.app-shell.with-tabs main.has-sticky {
+  padding-bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + 4.5rem);
 }
