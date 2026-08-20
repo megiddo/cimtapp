@@ -182,3 +182,11 @@ export function parseIuInput(raw: string): number | null {
   }
   return value;
 }
+
+export function trimNumber(value: number): string {
+  return String(Number(value.toFixed(4)));
+}
+
+export function syringeLabel(volumeMl: number, capacityIu: number): string {
+  return `${trimNumber(volumeMl)} mL / ${trimNumber(capacityIu)} IU`;
+}

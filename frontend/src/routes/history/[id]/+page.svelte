@@ -11,6 +11,7 @@
     stepIu
   } from '$lib/dose';
   import { toDatetimeLocalValue } from '$lib/datetime';
+  import { OFFLINE_SAVE_MESSAGE, saveWhileOnline } from '$lib/offline';
   import { firstFieldError, type FieldMap } from '$lib/payload';
   import { fetchSyringes, fetchUse, patchUse, type LoggedUse, type Syringe } from '$lib/inventory';
 
@@ -23,6 +24,8 @@
   let pending = $state(false);
   let fields = $state<FieldMap>({});
   let loaded = $state(false);
+  let toast = $state('');
+  let iuError = $state('');
 
   const iu = $derived(parseIuInput(iuText));
   const syringe = $derived(syringes.find((item) => item.id === syringeId) ?? null);
@@ -62,20 +65,34 @@
     }
     pending = true;
     fields = {};
-    const result = await patchUse(original.id, {
-      iu,
-      syringe_id: syringeId || undefined,
-      used_at: usedAt,
-      notes: notes === '' ? null : notes
-    });
-    pending = false;
-    if (result.ok) {
-      await goto('/history');
-      return;
+    toast = '';
+    iuError = '';
+    try {
+      const result = await saveWhileOnline(() =>
+        patchUse(original.id, {
+          iu,
+          syringe_id: syringeId || undefined,
+          used_at: usedAt,
+          notes: notes === '' ? null : notes
+        })
+      );
+      pending = false;
+      if (result.ok) {
+        await goto('/history');
+        return;
+      }
+      fields = result.fields;
+      iuError = firstFieldError(result.fields, 'iu') ?? result.message;
+    } catch {
+      pending = false;
+      toast = OFFLINE_SAVE_MESSAGE;
     }
-    fields = result.fields;
   }
 </script>
+
+{#if toast}
+  <p class="toast" role="status">{toast}</p>
+{/if}
 
 {#if !loaded}
   <p class="muted">Loading…</p>
@@ -86,12 +103,12 @@
     <label>
       IU
       <div class="stepper">
-        <button type="button" aria-label="Decrease IU" onclick={() => (iuText = String(stepIu(iu ?? 1, -1)))}>−</button>
-        <input inputmode="decimal" name="iu" bind:value={iuText} />
-        <button type="button" aria-label="Increase IU" onclick={() => (iuText = String(stepIu(iu ?? 0, 1)))}>+</button>
+        <button type="button" aria-label="Decrease IU" disabled={pending} onclick={() => (iuText = String(stepIu(iu ?? 1, -1)))}>−</button>
+        <input inputmode="decimal" name="iu" bind:value={iuText} disabled={pending} />
+        <button type="button" aria-label="Increase IU" disabled={pending} onclick={() => (iuText = String(stepIu(iu ?? 0, 1)))}>+</button>
       </div>
-      {#if firstFieldError(fields, 'iu')}
-        <span class="field-error">{firstFieldError(fields, 'iu')}</span>
+      {#if iuError}
+        <span class="field-error">{iuError}</span>
       {/if}
     </label>
 
@@ -123,7 +140,7 @@
     </div>
 
     <div class="sticky-cta">
-      <button type="submit" disabled={pending || iu === null}>{pending ? 'Saving…' : 'Save'}</button>
+      <button type="submit" disabled={pending || !loaded || iu === null}>{pending ? 'Saving…' : 'Save'}</button>
     </div>
   </form>
 {/if}

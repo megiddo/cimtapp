@@ -2,7 +2,7 @@
 
 Compounded Incretin Mimetic Tracking App: a personal compounding log. Mix a vial, log each use in IU against a named syringe, see milligrams deducted, and watch the active vial burn down.
 
-This repository currently ships **Phase 2 domain**: mix a vial, log a use in IU, see milligrams and remainder, edit the use, and browse newest-first history. Overdraw is HTTP 422 with `error.remaining_iu`. Cookie sessions and encrypted user sqlite come from Phase 1.
+This repository currently ships **v1 (Phase 3)**: mix a vial, log IU, remainder, settings syringes, empty/error states, PWA Add to Home Screen, login/Google rate limits, AMK rotation, and an authenticated sqlite export. Cookie sessions and encrypted user sqlite come from Phase 1.
 
 ## Quick start (Docker)
 
@@ -16,7 +16,7 @@ App URL: **http://localhost:8080**
 
 Health: **http://localhost:8080/api/v1/health** → `{ "status": "ok" }`
 
-Auth (same origin, cookie `cimtapp_session`): `POST /api/v1/auth/register`, `/auth/login`, `/auth/logout`; `GET /api/v1/auth/google/start` (full page); `GET /api/v1/me`. Domain (cookie required): `GET /peptide-types`, `/syringes`, `/compounds`, `/compounds/current` (**404** if none), `/uses`; `POST /compounds` (mix), `POST /uses` (log). Passwords are Argon2id, minimum 12 characters. Google is mocked in tests — no real `GOOGLE_CLIENT_*` required outside production.
+Auth (same origin, cookie `cimtapp_session`): `POST /api/v1/auth/register`, `/auth/login`, `/auth/logout`; `GET /api/v1/auth/google/start` (full page); `GET /api/v1/me`. Login and Google start are limited to **10 attempts / 15 minutes** per IP (and per email for login). Domain (cookie required): `GET /peptide-types`, `/syringes`, `/compounds`, `/compounds/current` (**404** if none), `/uses`; `POST /compounds` (mix), `POST /uses` (log). `GET /api/v1/me/export` downloads the logged-in user’s plaintext sqlite. Passwords are Argon2id, minimum 12 characters. Google is mocked in tests — no real `GOOGLE_CLIENT_*` required outside production.
 
 `make up` is equivalent to copying `.env` if missing and running `docker compose up --build`. Bind-mounts `backend/` for PHP edits. SQLite files persist in the `cimtapp-data` volume at `/var/www/cimtapp/data`. Decrypted user sqlite is written only under `DATA_DIR/tmp` (`/var/www/cimtapp/data/tmp` in Docker, tmpfs-mounted).
 
@@ -61,11 +61,11 @@ Examples live at `.env.example` and `backend/.env.example`. Real `.env` files ar
 backend/          Slim 4 (slim-skeleton): public/index.php, app/, src/, tests/
 backend/migrations/  global + per-user sqlite SQL, applied on boot / account create
 frontend/         SvelteKit + adapter-static (SPA, no Svelte server)
-docs/             DESIGN, work checklist, testing gates
+docs/             DESIGN, work checklist, testing gates, backup / AMK rotation
 data/             gitignored sqlite / encrypted user stores (`tmp/` plaintext while unlocked)
 ```
 
-Architecture summary: [docs/DESIGN.md](docs/DESIGN.md). Phased work: [docs/WORK-CHECKLIST.md](docs/WORK-CHECKLIST.md).
+Architecture summary: [docs/DESIGN.md](docs/DESIGN.md). Phased work: [docs/WORK-CHECKLIST.md](docs/WORK-CHECKLIST.md). Backup: [docs/BACKUP.md](docs/BACKUP.md).
 
 ## License
 

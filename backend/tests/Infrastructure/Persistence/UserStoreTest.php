@@ -156,6 +156,36 @@ class UserStoreTest extends TestCase
         $this->assertFalse($email);
     }
 
+    public function testExportPlaintextReturnsSqliteAndShredsTmp(): void
+    {
+        $this->store->create(self::USER_ID, $this->dek);
+        $this->store->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
+            $pdo->prepare(
+                'INSERT INTO account (user_id, email, password_hash, google_sub, updated_at)
+                 VALUES (?, ?, NULL, NULL, ?)'
+            )->execute([self::USER_ID, 'export@example.com', '2026-08-20T15:00:00Z']);
+        });
+        $enc = $this->dir . '/users/' . self::USER_ID . '.sqlite.enc';
+        $before = hash_file('sha256', $enc);
+
+        $bytes = $this->store->exportPlaintext(self::USER_ID, $this->dek);
+        $this->assertStringStartsWith('SQLite format 3', $bytes);
+        $this->assertSame($before, hash_file('sha256', $enc));
+        $this->assertSame([], glob($this->dir . '/tmp/*.sqlite') ?: []);
+
+        $tmp = $this->dir . '/read-export.sqlite';
+        file_put_contents($tmp, $bytes);
+        $pdo = new PDO('sqlite:' . $tmp);
+        $this->assertSame('export@example.com', $pdo->query('SELECT email FROM account')->fetchColumn());
+    }
+
+    public function testExportMissingStoreFails(): void
+    {
+        $this->expectException(UserStoreException::class);
+        $this->expectExceptionMessage('User store not found.');
+        $this->store->exportPlaintext(self::USER_ID, $this->dek);
+    }
+
     public function testCreateTwiceFails(): void
     {
         $this->store->create(self::USER_ID, $this->dek);

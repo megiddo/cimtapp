@@ -14,6 +14,7 @@ use App\Application\Actions\Compounds\ListCompoundsAction;
 use App\Application\Actions\Compounds\PatchCompoundAction;
 use App\Application\Actions\Compounds\ViewCompoundAction;
 use App\Application\Actions\Health\HealthAction;
+use App\Application\Actions\Me\ExportUserAction;
 use App\Application\Actions\Me\SetPasswordAction;
 use App\Application\Actions\Me\ViewMeAction;
 use App\Application\Actions\Syringes\CreateSyringeAction;
@@ -39,6 +40,7 @@ return function (App $app): void {
         $group->group('', function (Group $authed): void {
             $authed->get('/me', ViewMeAction::class);
             $authed->post('/me/password', SetPasswordAction::class);
+            $authed->get('/me/export', ExportUserAction::class);
             $authed->get('/peptide-types', ListPeptideTypesAction::class);
             $authed->get('/syringes', ListSyringesAction::class);
             $authed->post('/syringes', CreateSyringeAction::class);

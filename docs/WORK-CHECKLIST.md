@@ -1,6 +1,6 @@
 # CIMTapp work checklist
 
-Implementation-sized items from the design plan. Framework (this branch) marks scaffolding done; P2 domain is checked off.
+Implementation-sized items from the design plan. Framework through P3 (v1) are checked off.
 
 ## Testing gates
 
@@ -54,14 +54,13 @@ Gate: mix a vial, log a use in IU, see mg and remainder, edit the use, and get a
 
 Gate: usable one-handed on iPhone SE-width Safari with empty/error states; tests around crypto and remainder; documented backup (AMK + global + user files).
 
-- [ ] Empty states: no vial, no uses; remainder warning/danger tones; 422 copy on overdraw
-- [ ] Settings: syringes, set password on Google-only accounts, logout
-- [ ] Mobile shell QA: 360px floor, 48px targets, 56px rows, sticky Save above tabs, safe-area, 16px inputs, native datetime-local
-- [ ] Tests: crypto wrap round-trip, flock serializes writes, dose math, auth email linking
-- [ ] Rate-limit login and Google start; generic auth errors; secure cookie flags
-- [ ] Backup note: copy `data/` + `CIMT_MASTER_KEY`; optional decrypt-to-sqlite export for a logged-in user
-- [ ] DEK rewrap helper for AMK rotation; confirm old ciphertext still opens
+- [x] Empty states: no vial, no uses; remainder warning/danger tones; 422 copy on overdraw
+- [x] Settings: syringes, set password on Google-only accounts, logout
+- [x] Mobile shell QA: 360px floor, 48px targets, 56px rows, sticky Save above tabs, safe-area, 16px inputs, native datetime-local
+- [x] Tests: crypto wrap round-trip, flock serializes writes, dose math, auth email linking
+- [x] Rate-limit login and Google start; generic auth errors; secure cookie flags
+- [x] Backup note: copy `data/` + `CIMT_MASTER_KEY`; optional decrypt-to-sqlite export for a logged-in user
+- [x] DEK rewrap helper for AMK rotation; confirm old ciphertext still opens
 
-## Suggested first slice after this branch
+v1 is complete. Out of scope remains: new peptide types, household sharing, zero-knowledge keys, charts, CSV, reminders.
 
-Password register/login plus a throwaway “write a row into the user DB” endpoint, to prove encrypt / lock / decrypt before Google or dose math.

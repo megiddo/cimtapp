@@ -105,6 +105,36 @@ final class UserStore implements UserStorePort
     }
 
     /**
+     * Decrypt the user store into memory and shred the tmp file before returning.
+     * Does not rewrite the .enc file.
+     */
+    public function exportPlaintext(string $userId, string $dek): string
+    {
+        $this->assertUserId($userId);
+        $this->paths->ensure();
+
+        return $this->withLock($userId, function () use ($userId, $dek): string {
+            $encPath = $this->paths->userEnc($userId);
+            if (!is_file($encPath)) {
+                throw new UserStoreException('User store not found.');
+            }
+
+            $plainPath = $this->uniquePlainPath($userId);
+            try {
+                $this->crypto->decryptFile($encPath, $plainPath, $dek);
+                $bytes = file_get_contents($plainPath);
+                if (!is_string($bytes) || $bytes === '') {
+                    throw new UserStoreException('Unable to export user store.');
+                }
+
+                return $bytes;
+            } finally {
+                $this->shred($plainPath);
+            }
+        });
+    }
+
+    /**
      * @template T
      * @param callable(): T $callback
      * @return T

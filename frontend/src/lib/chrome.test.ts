@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CONTENT_MAX_PX,
   DESIGN_FLOOR_PX,
+  INPUT_FONT_PX,
   backHrefForPath,
   emphasizedTab,
   emphasizedTabFrom,
@@ -9,8 +10,10 @@ import {
   MIN_TAP_PX,
   NAV_TABS,
   needsStickyCta,
+  ROW_MIN_PX,
   showsSettingsLink,
   showsTabBar,
+  TAB_BAR_HEIGHT_PX,
   titleForPath
 } from './chrome';
 
@@ -19,6 +22,9 @@ describe('chrome layout tokens', () => {
     expect(DESIGN_FLOOR_PX).toBe(360);
     expect(CONTENT_MAX_PX).toBe(430);
     expect(MIN_TAP_PX).toBe(48);
+    expect(ROW_MIN_PX).toBe(56);
+    expect(INPUT_FONT_PX).toBe(16);
+    expect(TAB_BAR_HEIGHT_PX).toBe(56);
     expect(CONTENT_MAX_PX).toBeGreaterThan(DESIGN_FLOOR_PX);
   });
 });

@@ -25,7 +25,7 @@ The server can decrypt user data after a successful login. That is required for 
 
 Three secrets, one unwrap path. The global DB never holds a plaintext user key.
 
-1. **AMK** (`CIMT_MASTER_KEY`) — 256-bit application master key in env. Wraps every per-user DEK. Rotatable by re-wrapping DEKs.
+1. **AMK** (`CIMT_MASTER_KEY`) — 256-bit application master key in env. Wraps every per-user DEK. Rotatable by re-wrapping DEKs (`Crypto::rewrapDek`, `bin/rotate-amk.php`). Does not rewrite `.enc` files.
 2. **DEK** — random 256-bit data key minted at account create. Stored as nonce + ciphertext in `users.encrypted_dek`.
 3. **User DB** — whole sqlite file wrapped with secretstream using the DEK. Decrypt only under an exclusive flock for the request.
 
@@ -51,6 +51,8 @@ Email is the account primary key (normalized `strtolower(trim)`). Password and G
 
 Session: opaque **32-byte hex** id (64 hex chars) in cookie **`cimtapp_session`**. Flags: HttpOnly, SameSite=Lax, Path=/, Secure from `SESSION_SECURE`. Server table `sessions` with **14-day sliding expiry** (each authenticated request extends `expires_at`). No JWT.
 
+Rate limits (global sqlite `rate_limit_hits`, no Redis): **10 attempts / 15 minutes**. `POST /auth/login` is keyed by IP and by normalized email when present. `GET /auth/google/start` is keyed by IP. Over budget → HTTP **429** `{ type: TOO_MANY_REQUESTS, description: "Too many attempts. Try again later." }` — same body for every caller (no user enumeration). Auth failures stay **“Invalid email or password”**. Counters use injected `Clock` and expired rows are deleted opportunistically.
+
 Request unlock path for protected routes (`/me`, later domain):
 
 1. `SessionAuthMiddleware` reads the cookie, loads a non-expired session, loads the user, unwraps the DEK with the AMK, touches sliding expiry, attaches `AuthContext` (user, DEK, session).
@@ -70,6 +72,7 @@ Each user sqlite includes an `account` snapshot (email, password hash, google_su
 - `sessions`: id opaque 32-byte hex, user_id, expires_at (14d), created_at
 - `peptide_types`: slug (`semaglutide`, `tirzepatide`, `retatrutide`, `liraglutide`), name, is_active, sort_order
 - `oauth_states`: state CSRF nonce, expires_at 10 min, redirect_after, code_verifier (PKCE)
+- `rate_limit_hits`: bucket + hit_at for login / Google-start budgets
 
 **Per-user** (applied from `migrations/user` at account create; peptide catalog denormalized onto each compound):
 
@@ -124,6 +127,7 @@ Success bodies stay `{ "statusCode": 201, "data": { ... } }`. `GET /me` data is 
 | GET | `/auth/google/callback` | exchange code, set cookie, 302 to `/` |
 | GET | `/me` | identity + remainder summary (auth) |
 | POST | `/me/password` | set or change password (auth) |
+| GET | `/me/export` | authenticated plaintext sqlite download (`application/octet-stream`); temp file shredded |
 | GET | `/peptide-types` | global catalog, active only, `sort_order` (`id` = slug) |
 | GET/POST | `/syringes` | list / create (`volume_ml` > 0, `capacity_iu` > 0; auto label `0.5 mL / 50 IU` if omitted; exactly one `is_default`) |
 | PATCH | `/syringes/{id}` | label and/or default flag (setting default unsets others) |
@@ -174,11 +178,11 @@ Rules: IU allows one decimal, reject `<= 0`. Store mg at 4 decimal places; displ
 
 ## Mobile-first UI
 
-Phone layout is the product. Design floor 360px (SE). Max content width 430px, single column, centered. Min tap 48px, list rows 56px. No desktop layout, sidebar, or hover-only control.
+Phone layout is the product. Design floor 360px (SE). Max content width 430px, single column, centered. Min tap 48px, list rows 56px. No desktop layout, sidebar, or hover-only control. Tokens live in `frontend/src/lib/chrome.ts` (`DESIGN_FLOOR_PX`, `CONTENT_MAX_PX`, `MIN_TAP_PX`, `ROW_MIN_PX`, `INPUT_FONT_PX`) and matching CSS variables.
 
-Viewport (this milestone): `width=device-width, initial-scale=1, viewport-fit=cover`. Tab bar and sticky CTAs pad `env(safe-area-inset-*)`. Body/inputs 16px so iOS Safari does not zoom.
+Viewport (this milestone): `width=device-width, initial-scale=1, viewport-fit=cover`. Tab bar and sticky CTAs pad `env(safe-area-inset-*)`. Body/inputs 16px so iOS Safari does not zoom. Add to Home Screen: `frontend/static/manifest.webmanifest` plus Apple `apple-mobile-web-app-capable` / title / status-bar meta in `app.html`. Desktop uses the same shell.
 
-Authenticated chrome: thin top bar + fixed bottom tabs. Login (`/login`) has no tabs. Home gear → `/settings` (set password + logout). Session-gated routes (Home, Log, Vials, History, Settings) redirect to `/login` when `GET /me` is 401. “Continue with Google” is a full-page navigation to `GET /api/v1/auth/google/start` (not XHR) because of the 302.
+Authenticated chrome: thin top bar + fixed bottom tabs. Login (`/login`) has no tabs. Home gear → `/settings` (syringes, set password, logout). Session-gated routes (Home, Log, Vials, History, Settings) redirect to `/login` when `GET /me` is 401. “Continue with Google” is a full-page navigation to `GET /api/v1/auth/google/start` (not XHR) because of the 302.
 
 | Tab | Route | Role |
 | --- | --- | --- |
@@ -196,6 +200,6 @@ Gate: nothing in the next phase starts until the previous gate is true.
 - **P0 Foundations** — health JSON, SPA in `public/`, env, global migrator, crypto, user-store wrap, 360px chrome.
 - **P1 Auth + stores** — register/login/Google, session, encrypted user sqlite with identity + default syringe.
 - **P2 Domain** — compounds, uses, burndown, overdraw 422.
-- **P3 UI + harden** — empty states, settings, mobile QA, crypto/dose tests, rate limits, backup note.
+- **P3 UI + harden** — empty states, settings syringes, mobile QA, PWA, crypto/dose tests, rate limits, backup + AMK rotation. **v1 complete.**
 
-See [WORK-CHECKLIST.md](WORK-CHECKLIST.md).
+See [WORK-CHECKLIST.md](WORK-CHECKLIST.md). Backup and AMK rotation: [BACKUP.md](BACKUP.md).

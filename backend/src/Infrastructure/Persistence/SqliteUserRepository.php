@@ -6,6 +6,7 @@ namespace App\Infrastructure\Persistence;
 
 use App\Domain\Auth\User;
 use App\Domain\Auth\UserRepository;
+use App\Domain\Crypto\WrappedDek;
 use PDO;
 use Throwable;
 
@@ -37,6 +38,23 @@ final class SqliteUserRepository implements UserRepository
         $stmt->execute([':sub' => $sub]);
 
         return $this->hydrate($stmt->fetch(PDO::FETCH_ASSOC));
+    }
+
+    public function listAll(): array
+    {
+        $stmt = $this->pdo()->query(
+            'SELECT * FROM users ORDER BY created_at ASC, id ASC'
+        );
+        $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $users = [];
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            $user = $this->hydrate($row);
+            if ($user !== null) {
+                $users[] = $user;
+            }
+        }
+
+        return $users;
     }
 
     public function insert(User $user): void
@@ -91,6 +109,18 @@ final class SqliteUserRepository implements UserRepository
     {
         $stmt = $this->pdo()->prepare('UPDATE users SET last_login_at = :at WHERE id = :id');
         $stmt->execute([':at' => $lastLoginAt, ':id' => $userId]);
+    }
+
+    public function updateWrappedDek(string $userId, WrappedDek $wrapped): void
+    {
+        $stmt = $this->pdo()->prepare(
+            'UPDATE users SET encrypted_dek = :ciphertext, dek_nonce = :nonce WHERE id = :id'
+        );
+        $stmt->execute([
+            ':ciphertext' => $wrapped->ciphertext(),
+            ':nonce' => $wrapped->nonce(),
+            ':id' => $userId,
+        ]);
     }
 
     private function pdo(): PDO

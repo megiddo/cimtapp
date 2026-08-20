@@ -17,7 +17,10 @@
 {#if !loaded}
   <p class="muted">Loading…</p>
 {:else if uses.length === 0}
-  <p>No uses yet.</p>
+  <div class="empty-state">
+    <p>No uses yet. Log a use from the Log tab.</p>
+    <a class="chip" href="/use/new">Log use</a>
+  </div>
 {:else}
   {#each groups as group (group.day)}
     <h2 class="day-heading">{group.heading}</h2>

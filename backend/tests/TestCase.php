@@ -129,6 +129,7 @@ class TestCase extends PHPUnit_TestCase
     /**
      * @param array<string, mixed> $body
      * @param array<string, string> $cookies
+     * @param array<string, mixed> $serverParams
      */
     protected function createJsonRequest(
         string $method,
@@ -136,6 +137,7 @@ class TestCase extends PHPUnit_TestCase
         array $body = [],
         array $cookies = [],
         string $query = '',
+        array $serverParams = [],
     ): Request {
         $uri = new Uri('', '', 80, $path, $query);
         $handle = fopen('php://temp', 'w+');
@@ -147,7 +149,7 @@ class TestCase extends PHPUnit_TestCase
         $h->addHeader('HTTP_ACCEPT', 'application/json');
         $h->addHeader('Content-Type', 'application/json');
 
-        return new SlimRequest($method, $uri, $h, $cookies, [], $stream);
+        return new SlimRequest($method, $uri, $h, $cookies, $serverParams, $stream);
     }
 
     /**

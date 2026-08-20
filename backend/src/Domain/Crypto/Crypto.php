@@ -67,6 +67,17 @@ final class Crypto
         return $dek;
     }
 
+    /**
+     * Unwrap a DEK with this AMK and wrap it with $newCrypto's AMK.
+     * File ciphertext is unchanged; only users.encrypted_dek / dek_nonce rotate.
+     */
+    public function rewrapDek(string $nonce, string $ciphertext, self $newCrypto): WrappedDek
+    {
+        $dek = $this->unwrapDek($nonce, $ciphertext);
+
+        return $newCrypto->wrapDek($dek);
+    }
+
     public function encryptFile(string $plaintextPath, string $ciphertextPath, string $dek): void
     {
         $this->assertDek($dek);

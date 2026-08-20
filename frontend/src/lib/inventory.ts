@@ -182,6 +182,38 @@ export async function patchUse(
   return asResult(payload, 'Unable to save use.');
 }
 
+export async function createSyringe(
+  body: {
+    volume_ml: number;
+    capacity_iu: number;
+    label?: string;
+    is_default?: boolean;
+  },
+  baseUrl = ''
+): Promise<DomainResult<Syringe>> {
+  const payload = await readAction<Syringe>('/api/v1/syringes', {
+    baseUrl,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return asResult(payload, 'Unable to add syringe.');
+}
+
+export async function patchSyringe(
+  id: string,
+  body: { label?: string; is_default?: boolean },
+  baseUrl = ''
+): Promise<DomainResult<Syringe>> {
+  const payload = await readAction<Syringe>(`/api/v1/syringes/${id}`, {
+    baseUrl,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return asResult(payload, 'Unable to update syringe.');
+}
+
 export function defaultSyringeId(syringes: Syringe[], lastUsedId: string | null): string {
   if (lastUsedId !== null && syringes.some((item) => item.id === lastUsedId)) {
     return lastUsedId;

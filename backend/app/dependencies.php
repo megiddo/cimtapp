@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Application\Boot\BootServices;
 use App\Application\Settings\SettingsInterface;
+use App\Domain\Auth\AuthRateLimiter;
 use App\Domain\Auth\AuthService;
 use App\Domain\Auth\Clock;
 use App\Domain\Auth\CredentialParser;
@@ -16,6 +17,7 @@ use App\Domain\Auth\SessionService;
 use App\Domain\Auth\SystemClock;
 use App\Domain\Auth\UserProvisioner;
 use App\Domain\Auth\UserStorePort;
+use App\Domain\Crypto\AmkRotator;
 use App\Domain\Crypto\Crypto;
 use App\Domain\Dose\CompoundService;
 use App\Domain\Dose\DoseCalculator;
@@ -171,6 +173,16 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(IdGenerator::class),
                 $c->get(Clock::class),
             );
+        },
+        AuthRateLimiter::class => static function (ContainerInterface $c): AuthRateLimiter {
+            return new AuthRateLimiter(
+                $c->get(\App\Domain\Auth\RateLimitRepository::class),
+                $c->get(Clock::class),
+                $c->get(EmailNormalizer::class),
+            );
+        },
+        AmkRotator::class => static function (ContainerInterface $c): AmkRotator {
+            return new AmkRotator($c->get(\App\Domain\Auth\UserRepository::class));
         },
         \App\Application\Actions\Auth\GoogleCallbackAction::class => static function (ContainerInterface $c): \App\Application\Actions\Auth\GoogleCallbackAction {
             $settings = $c->get(SettingsInterface::class);

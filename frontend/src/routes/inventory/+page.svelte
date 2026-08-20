@@ -15,7 +15,9 @@
 {#if !loaded}
   <p class="muted">Loading…</p>
 {:else if compounds.length === 0}
-  <p>No vials yet.</p>
+  <div class="empty-state">
+    <p>No vials yet. Mix a vial to start.</p>
+  </div>
 {:else}
   <div class="cards">
     {#each compounds as compound, index (compound.id)}

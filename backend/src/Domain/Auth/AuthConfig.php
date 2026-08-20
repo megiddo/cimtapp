@@ -40,4 +40,11 @@ final class AuthConfig
     public const GOOGLE_FAILED = 'Unable to sign in with Google.';
 
     public const STORE_BUSY = 'The account is busy. Try again.';
+
+    /** Login and Google-start budget: 10 attempts per 15 minutes per IP (and per email for login). */
+    public const RATE_LIMIT_MAX = 10;
+
+    public const RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
+
+    public const RATE_LIMIT_MESSAGE = 'Too many attempts. Try again later.';
 }

@@ -23,8 +23,10 @@
 {#if !loaded}
   <p class="muted">Loading…</p>
 {:else if !current}
-  <p>Mix a vial to start.</p>
-  <a class="chip" href="/inventory/new">Mix vial</a>
+  <div class="empty-state">
+    <p>Mix a vial to start tracking remainder.</p>
+    <a class="chip" href="/inventory/new">Mix vial</a>
+  </div>
 {:else}
   <section class="hero {tone}">
     <div class="peptide">{current.peptide_type_name}</div>
@@ -39,18 +41,24 @@
     {/if}
   </section>
 
-  {#if last}
+  {#if tone === 'danger'}
+    <a class="chip" href="/inventory/new">Mix vial</a>
+  {:else if last}
     <a class="chip" href="/use/new?iu={last.iu}">Log {formatIu(last.iu)} IU again</a>
   {/if}
 
-  <div class="row-list">
-    {#each uses as use (use.id)}
-      <a class="row" href="/history/{use.id}">
-        <span>
-          <span class="primary">{formatDoseLine(use.iu, use.peptide_mg)}</span>
-          <div class="secondary">{formatTime(use.used_at)} · {use.peptide_type_name}</div>
-        </span>
-      </a>
-    {/each}
-  </div>
+  {#if uses.length === 0}
+    <p>No uses yet. Log a use from the Log tab.</p>
+  {:else}
+    <div class="row-list">
+      {#each uses as use (use.id)}
+        <a class="row" href="/history/{use.id}">
+          <span>
+            <span class="primary">{formatDoseLine(use.iu, use.peptide_mg)}</span>
+            <div class="secondary">{formatTime(use.used_at)} · {use.peptide_type_name}</div>
+          </span>
+        </a>
+      {/each}
+    </div>
+  {/if}
 {/if}

@@ -253,4 +253,28 @@ class HttpErrorHandlerTest extends TestCase
         $this->assertSame(503, $response->getStatusCode());
         $this->assertSame(ActionError::SERVICE_UNAVAILABLE, $payload['error']['type']);
     }
+
+    public function testRateLimitExceptionIsGeneric429(): void
+    {
+        $app = AppFactory::create();
+        $request = $this->createRequest('GET', '/x');
+        $handler = new HttpErrorHandler(
+            $app->getCallableResolver(),
+            $app->getResponseFactory(),
+            new NullLogger()
+        );
+        $response = $handler(
+            $request,
+            new \App\Domain\Auth\RateLimitException('ip=1.2.3.4 email=secret@example.com'),
+            true,
+            false,
+            false
+        );
+        $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(429, $response->getStatusCode());
+        $this->assertSame(ActionError::TOO_MANY_REQUESTS, $payload['error']['type']);
+        $this->assertSame(\App\Domain\Auth\AuthConfig::RATE_LIMIT_MESSAGE, $payload['error']['description']);
+        $this->assertStringNotContainsString('secret@example.com', (string) $response->getBody());
+        $this->assertStringNotContainsString('1.2.3.4', (string) $response->getBody());
+    }
 }

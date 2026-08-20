@@ -8,6 +8,7 @@ use App\Application\Actions\ActionError;
 use App\Application\Actions\ActionPayload;
 use App\Domain\Auth\AuthenticationException;
 use App\Domain\Auth\AuthConfig;
+use App\Domain\Auth\RateLimitException;
 use App\Domain\Auth\ValidationException;
 use App\Domain\Crypto\CryptoException;
 use App\Infrastructure\Persistence\UserStoreLockedException;
@@ -43,6 +44,9 @@ class HttpErrorHandler extends SlimErrorHandler
         } elseif ($exception instanceof AuthenticationException) {
             $statusCode = 401;
             $error = new ActionError(ActionError::UNAUTHENTICATED, $exception->getMessage());
+        } elseif ($exception instanceof RateLimitException) {
+            $statusCode = 429;
+            $error = new ActionError(ActionError::TOO_MANY_REQUESTS, AuthConfig::RATE_LIMIT_MESSAGE);
         } elseif ($exception instanceof UserStoreLockedException) {
             $statusCode = 503;
             $error = new ActionError(ActionError::SERVICE_UNAVAILABLE, AuthConfig::STORE_BUSY);
@@ -77,6 +81,7 @@ class HttpErrorHandler extends SlimErrorHandler
             !($exception instanceof HttpException)
             && !($exception instanceof ValidationException)
             && !($exception instanceof AuthenticationException)
+            && !($exception instanceof RateLimitException)
             && !($exception instanceof UserStoreLockedException)
             && !($exception instanceof CryptoException)
             && $this->displayErrorDetails

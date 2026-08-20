@@ -346,4 +346,41 @@ class CryptoTest extends TestCase
         $this->expectException(CryptoException::class);
         new WrappedDek(str_repeat("\0", SODIUM_CRYPTO_SECRETBOX_NONCEBYTES), '');
     }
+
+    public function testRewrapOpensWithNewAmkAndNotTheOld(): void
+    {
+        $old = Crypto::fromMasterKey(self::HEX_KEY);
+        $new = Crypto::fromMasterKey(self::OTHER_HEX_KEY);
+        $dek = $old->mintDek();
+        $wrapped = $old->wrapDek($dek);
+
+        $rewrapped = $old->rewrapDek($wrapped->nonce(), $wrapped->ciphertext(), $new);
+        $this->assertNotSame($wrapped->nonce(), $rewrapped->nonce());
+        $this->assertNotSame($wrapped->ciphertext(), $rewrapped->ciphertext());
+        $this->assertSame($dek, $new->unwrapDek($rewrapped->nonce(), $rewrapped->ciphertext()));
+
+        $this->expectException(CryptoException::class);
+        $old->unwrapDek($rewrapped->nonce(), $rewrapped->ciphertext());
+    }
+
+    public function testRewrapFileCiphertextStillOpensWithSameDek(): void
+    {
+        $old = Crypto::fromMasterKey(self::HEX_KEY);
+        $new = Crypto::fromMasterKey(self::OTHER_HEX_KEY);
+        $dek = $old->mintDek();
+        $plain = $this->dir . '/store.bin';
+        $enc = $this->dir . '/store.enc';
+        $out = $this->dir . '/store-out.bin';
+        file_put_contents($plain, 'user-sqlite-bytes');
+        $old->encryptFile($plain, $enc, $dek);
+        $before = hash_file('sha256', $enc);
+
+        $wrapped = $old->wrapDek($dek);
+        $rewrapped = $old->rewrapDek($wrapped->nonce(), $wrapped->ciphertext(), $new);
+        $opened = $new->unwrapDek($rewrapped->nonce(), $rewrapped->ciphertext());
+        $this->assertSame($dek, $opened);
+        $new->decryptFile($enc, $out, $opened);
+        $this->assertSame('user-sqlite-bytes', (string) file_get_contents($out));
+        $this->assertSame($before, hash_file('sha256', $enc));
+    }
 }

@@ -9,6 +9,8 @@ import {
   fetchUses,
   logUse,
   mixCompound,
+  createSyringe,
+  patchSyringe,
   patchUse,
   remainingIuFrom
 } from './inventory';
@@ -145,5 +147,50 @@ describe('inventory API client', () => {
     expect(remainingIuFrom({ error: { remaining_iu: 175 } })).toBe(175);
     expect(remainingIuFrom({ error: { remaining_iu: '175' } })).toBeNull();
     expect(remainingIuFrom({})).toBeNull();
+  });
+
+  it('creates and patches syringes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(201, {
+          statusCode: 201,
+          data: { id: 's2', label: '1 mL / 40 IU', volume_ml: 1, capacity_iu: 40, is_default: false }
+        })
+      )
+    );
+    await expect(createSyringe({ volume_ml: 1, capacity_iu: 40 })).resolves.toMatchObject({
+      ok: true,
+      status: 201
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(200, {
+          statusCode: 200,
+          data: { id: 's2', label: '1 mL / 40 IU', volume_ml: 1, capacity_iu: 40, is_default: true }
+        })
+      )
+    );
+    await expect(patchSyringe('s2', { is_default: true })).resolves.toMatchObject({ ok: true });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(422, {
+          statusCode: 422,
+          error: {
+            type: 'VALIDATION_ERROR',
+            description: 'Validation failed.',
+            fields: { volume_ml: ['Must be greater than 0.'] }
+          }
+        })
+      )
+    );
+    await expect(createSyringe({ volume_ml: 0, capacity_iu: 50 })).resolves.toMatchObject({
+      ok: false,
+      status: 422
+    });
   });
 });

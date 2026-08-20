@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Auth;
 
+use App\Domain\Crypto\WrappedDek;
+
 interface UserRepository
 {
     public function findById(string $id): ?User;
@@ -11,6 +13,11 @@ interface UserRepository
     public function findByEmail(string $email): ?User;
 
     public function findByGoogleSub(string $sub): ?User;
+
+    /**
+     * @return list<User>
+     */
+    public function listAll(): array;
 
     public function insert(User $user): void;
 
@@ -24,4 +31,6 @@ interface UserRepository
     public function setPasswordHash(string $userId, string $passwordHash): void;
 
     public function updateLastLogin(string $userId, string $lastLoginAt): void;
+
+    public function updateWrappedDek(string $userId, WrappedDek $wrapped): void;
 }

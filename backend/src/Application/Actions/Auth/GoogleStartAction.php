@@ -8,9 +8,11 @@ use App\Application\Actions\Action;
 use App\Application\Actions\ActionError;
 use App\Application\Actions\ActionPayload;
 use App\Domain\Auth\AuthConfig;
+use App\Domain\Auth\AuthRateLimiter;
 use App\Domain\Auth\GoogleOAuthClient;
 use App\Domain\Auth\IdGenerator;
 use App\Domain\Auth\OauthStateService;
+use App\Infrastructure\Http\ClientIp;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Log\LoggerInterface;
 
@@ -21,12 +23,15 @@ final class GoogleStartAction extends Action
         private readonly GoogleOAuthClient $google,
         private readonly OauthStateService $oauthStates,
         private readonly IdGenerator $ids,
+        private readonly AuthRateLimiter $limiter,
     ) {
         parent::__construct($logger);
     }
 
     protected function action(): Response
     {
+        $this->limiter->guardGoogleStart(ClientIp::from($this->request));
+
         if (!$this->google->isConfigured()) {
             $error = new ActionError(ActionError::SERVICE_UNAVAILABLE, AuthConfig::GOOGLE_UNAVAILABLE);
 

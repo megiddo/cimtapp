@@ -19,6 +19,8 @@ import {
   roundMg,
   roundVolume,
   stepIu,
+  syringeLabel,
+  trimNumber,
   unusualConcentration,
   volumeMl
 } from './dose';
@@ -111,5 +113,12 @@ describe('dose formulas', () => {
     expect(unusualConcentration(0.5)).toBe(false);
     expect(unusualConcentration(20)).toBe(false);
     expect(unusualConcentration(5)).toBe(false);
+  });
+
+  it('builds auto syringe labels without trailing zeros', () => {
+    expect(syringeLabel(0.5, 50)).toBe('0.5 mL / 50 IU');
+    expect(syringeLabel(1, 40)).toBe('1 mL / 40 IU');
+    expect(trimNumber(1.25)).toBe('1.25');
+    expect(trimNumber(0.5)).toBe('0.5');
   });
 });
