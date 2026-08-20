@@ -1,0 +1,1 @@
+import{a as o,f as t}from"../chunks/CuRY8J_y.js";import{ay as m,R as r,ah as i,T as p}from"../chunks/41g6GhuF.js";m();var l=t("<main><h1></h1> <p>Compounded incretin mimetic tracker. Shell only — domain UI is later.</p></main>");function h(e){var a=l(),n=r(a);n.textContent="CIMTapp",i(2),p(a),o(e,a)}export{h as component};

@@ -1,0 +1,26 @@
+{
+    // Empty interface / empty marker exceptions have no killable mutants.
+    // ActionTest still covers DomainRecordNotFoundException → HTTP 404.
+    "$schema": "https://raw.githubusercontent.com/infection/infection/master/resources/schema.json",
+    "source": {
+        "directories": [
+            "src"
+        ],
+        "excludes": [
+            "Application/Settings/SettingsInterface.php",
+            "Domain/DomainException"
+        ]
+    },
+    "logs": {
+        "text": "infection.log",
+        "html": "infection.html"
+    },
+    "tmpDir": ".infection",
+    "testFramework": "phpunit",
+    "mutators": {
+        "@default": true
+    },
+    "minMsi": 80,
+    "minCoveredMsi": 85,
+    "timeout": 10
+}

@@ -1,0 +1,1 @@
+# Persistent sqlite and encrypted user stores. Bind-mounted in Docker at /var/www/cimtapp/data.

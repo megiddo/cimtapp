@@ -1,0 +1,15 @@
+Options All -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Existing files (SPA assets, favicon) are served as-is.
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # JSON API goes through the Slim front controller.
+    RewriteRule ^api/ index.php [QSA,L]
+
+    # SPA fallback for client routes. CORS is not used (same origin).
+    RewriteRule ^ index.html [QSA,L]
+</IfModule>
