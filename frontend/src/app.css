@@ -1,6 +1,13 @@
 :root {
-  color: #111;
-  background: #f4f1ea;
+  --content-max: 430px;
+  --design-floor: 360px;
+  --tap-min: 48px;
+  --tab-bar-height: 56px;
+  --ink: #111;
+  --paper: #f4f1ea;
+  --accent: #1f4e3d;
+  color: var(--ink);
+  background: var(--paper);
   font-family: system-ui, sans-serif;
   font-size: 16px;
 }
@@ -11,17 +18,108 @@ body {
   min-height: 100%;
 }
 
-main {
-  box-sizing: border-box;
-  margin: 0 auto;
-  max-width: 430px;
-  min-height: 100dvh;
-  padding: 1.25rem;
-  padding-top: calc(1.25rem + env(safe-area-inset-top));
-  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+body,
+input,
+textarea,
+select,
+button {
+  font-size: 16px;
 }
 
-h1 {
-  font-size: 1.5rem;
-  margin: 0 0 0.5rem;
+.app-shell {
+  box-sizing: border-box;
+  margin: 0 auto;
+  width: 100%;
+  max-width: var(--content-max);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.top-bar {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: var(--tap-min);
+  padding: env(safe-area-inset-top) 1rem 0.25rem;
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+  z-index: 2;
+}
+
+.top-bar h1 {
+  font-size: 1.15rem;
+  margin: 0;
+  font-weight: 650;
+}
+
+.gear {
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+main {
+  box-sizing: border-box;
+  flex: 1;
+  padding: 0.75rem 1.25rem 1.25rem;
+}
+
+.app-shell.with-tabs main {
+  padding-bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + 1rem);
+}
+
+.tab-bar {
+  box-sizing: border-box;
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--content-max);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  min-height: var(--tab-bar-height);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: #fff;
+  border-top: 1px solid #ddd;
+  z-index: 3;
+}
+
+.tab-bar a {
+  box-sizing: border-box;
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: #444;
+  font-size: 0.85rem;
+}
+
+.tab-bar a.active {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.tab-bar a.emphasized {
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+  margin: 4px 8px;
+  font-weight: 700;
+}
+
+p {
+  margin: 0;
+  line-height: 1.4;
 }

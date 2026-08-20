@@ -4,18 +4,23 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Application\Boot\BootServices;
 use App\Application\Handlers\HttpErrorHandler;
 use DI\ContainerBuilder;
 use Exception;
+use FilesystemIterator;
 use PHPUnit\Framework\TestCase as PHPUnit_TestCase;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Log\NullLogger;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Slim\App;
 use Slim\Factory\AppFactory;
 use Slim\Psr7\Factory\StreamFactory;
 use Slim\Psr7\Headers;
 use Slim\Psr7\Request as SlimRequest;
 use Slim\Psr7\Uri;
+use SplFileInfo;
 
 class TestCase extends PHPUnit_TestCase
 {
@@ -36,6 +41,7 @@ class TestCase extends PHPUnit_TestCase
         $repositories($containerBuilder);
 
         $container = $containerBuilder->build();
+        $container->get(BootServices::class)->boot();
 
         AppFactory::setContainer($container);
         $app = AppFactory::create();
@@ -82,5 +88,36 @@ class TestCase extends PHPUnit_TestCase
         }
 
         return new SlimRequest($method, $uri, $h, $cookies, $serverParams, $stream);
+    }
+
+    protected function makeTempDir(string $prefix = 'cimtapp-'): string
+    {
+        $dir = sys_get_temp_dir() . '/' . $prefix . bin2hex(random_bytes(8));
+        mkdir($dir, 0700, true);
+
+        return $dir;
+    }
+
+    protected function removeDir(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($iterator as $file) {
+            if ($file->isDir()) {
+                rmdir($file->getPathname());
+            } else {
+                unlink($file->getPathname());
+            }
+        }
+
+        rmdir($dir);
     }
 }

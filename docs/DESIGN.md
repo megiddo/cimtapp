@@ -9,9 +9,10 @@ Condensed from the design canvas so later agents do not need it. Product: a pers
 | API | Slim 4, PHP 8.3+, PHP-DI | JSON under `/api/v1`. Skeleton lives in `backend/` (`public/index.php`, `app/`, `src/`). |
 | SPA | SvelteKit + `@sveltejs/adapter-static` | Client routes only. Build drops into `backend/public/` (`fallback: index.html`). No Svelte server. |
 | Serving | Same origin | Slim (or Apache) serves `/api/v1/*` via `index.php`; everything else is static + SPA fallback. Cookie session. No CORS. |
-| Global store | `data/global.sqlite` | Users, sessions, wrapped DEKs, peptide catalog. Not implemented yet. |
-| User store | `data/users/{uuid}.sqlite.enc` | Compounds, uses, syringe profiles, identity snapshot. Not implemented yet. |
-| Crypto | libsodium secretbox + secretstream | Stock PHP (`ext-sodium`). No SQLCipher. |
+| Global store | `data/global.sqlite` | Users, sessions, wrapped DEKs, peptide catalog. Migrated on Slim boot. |
+| User store | `data/users/{uuid}.sqlite.enc` | Compounds, uses, syringe profiles, identity snapshot. Locked per request. |
+| Crypto | libsodium secretbox + secretstream | `App\Domain\Crypto\Crypto`. Stock PHP (`ext-sodium`). No SQLCipher. |
+| Plaintext tmp | `DATA_DIR/tmp` | Decrypted user sqlite while a request holds the flock. Docker mounts tmpfs at `/var/www/cimtapp/data/tmp`. |
 | OAuth | Google authorization code | Server exchanges the code. Never put the client secret in the SPA. |
 
 PHP front controller matches the Slim skeleton: PHP-DI `ContainerBuilder`, `app/settings.php` + `dependencies.php` + `repositories.php`, `AppFactory::setContainer`, middleware + routes, `ServerRequestCreatorFactory`, `HttpErrorHandler`, `ShutdownHandler`, routing/body/error middleware, `ResponseEmitter`.
@@ -29,6 +30,10 @@ Three secrets, one unwrap path. The global DB never holds a plaintext user key.
 3. **User DB** — whole sqlite file wrapped with secretstream using the DEK. Decrypt only under an exclusive flock for the request.
 
 Request unlock path: session cookie → user row + encrypted DEK → unwrap DEK with AMK → flock `users/{id}.lock` → decrypt `.enc` to tmpfs sqlite → handler → close, re-encrypt, atomic `rename()` → unlock. File wrapping is last-writer-wins without a lock; every mutating request must hold the exclusive flock. One active person at a time is the product.
+
+Boot (`App\Application\Boot\BootServices`): `GlobalMigrator` applies `backend/migrations/global/*.sql` onto `{DATA_DIR}/global.sqlite` (creates the dir if missing). Second boot is a no-op via `schema_migrations`. Peptide seed is `INSERT OR IGNORE`.
+
+Open a user store (Phase 1 will call this from auth middleware): inject `App\Infrastructure\Persistence\UserStore`, unwrap the DEK with `Crypto`, then `UserStore::withUnlocked($userId, $dek, function (PDO $pdo) { ... })`. `create($userId, $dek)` applies `backend/migrations/user/*.sql` to a fresh sqlite, encrypts, and writes `{DATA_DIR}/users/{uuid}.sqlite.enc`. Lock timeout throws `UserStoreLockedException` (map to HTTP 503 in Phase 1). Plaintext files live only under `{DATA_DIR}/tmp/` for the duration of the callback.
 
 Future (not v1): wrap DEK with Argon2id from the user password for password-only zero-knowledge. Google accounts cannot use that model without a recovery secret.
 
@@ -49,7 +54,7 @@ Each user sqlite includes an `account` snapshot (email, password hash, google_su
 
 ## Schema sketch
 
-**Global** (not encrypted as a whole; DEKs inside it are):
+**Global** (not encrypted as a whole; DEKs inside it are; created by `GlobalMigrator`):
 
 - `users`: id UUID, email unique lowercase, password_hash Argon2id nullable, google_sub unique nullable, encrypted_dek, dek_nonce, created_at, last_login_at
 - `sessions`: id opaque 32-byte hex, user_id, expires_at (14d), created_at
@@ -111,7 +116,7 @@ Phone layout is the product. Design floor 360px (SE). Max content width 430px, s
 
 Viewport (this milestone): `width=device-width, initial-scale=1, viewport-fit=cover`. Tab bar and sticky CTAs pad `env(safe-area-inset-*)`. Body/inputs 16px so iOS Safari does not zoom.
 
-Authenticated chrome (Phase 0 remaining / Phase 3): thin top bar + fixed bottom tabs.
+Authenticated chrome (this milestone): thin top bar + fixed bottom tabs. Login (`/login`) has no tabs. Home gear → `/settings` stub.
 
 | Tab | Route | Role |
 | --- | --- | --- |
@@ -126,7 +131,7 @@ Login has no tabs. Settings is `/settings` from the Home gear. Copy voice: clini
 
 Gate: nothing in the next phase starts until the previous gate is true.
 
-- **P0 Foundations** — health JSON, SPA in `public/`, env, later crypto + migrators + 360px chrome.
+- **P0 Foundations** — health JSON, SPA in `public/`, env, global migrator, crypto, user-store wrap, 360px chrome.
 - **P1 Auth + stores** — register/login/Google, session, encrypted user sqlite with identity + default syringe.
 - **P2 Domain** — compounds, uses, burndown, overdraw 422.
 - **P3 UI + harden** — empty states, settings, mobile QA, crypto/dose tests, rate limits, backup note.

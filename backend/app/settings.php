@@ -43,6 +43,7 @@ return function (ContainerBuilder $containerBuilder): void {
                 'dataDir' => $validated['dataDir'],
                 'appUrl' => $validated['appUrl'],
                 'sessionSecure' => $validated['sessionSecure'],
+                'masterKey' => $validated['masterKey'],
                 'masterKeyConfigured' => true,
                 'logger' => [
                     'name' => 'cimtapp',

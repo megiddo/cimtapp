@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Application\Boot\BootServices;
 use App\Application\Handlers\HttpErrorHandler;
 use App\Application\Handlers\ShutdownHandler;
 use App\Application\ResponseEmitter\ResponseEmitter;
@@ -43,6 +44,7 @@ $repositories($containerBuilder);
 
 // Build PHP-DI Container instance
 $container = $containerBuilder->build();
+$container->get(BootServices::class)->boot();
 
 // Instantiate the app
 AppFactory::setContainer($container);

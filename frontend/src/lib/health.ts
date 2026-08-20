@@ -1,3 +1,5 @@
+import { apiFetch } from './api';
+
 export type HealthStatusValue = 'ok' | 'degraded';
 
 export type HealthResponse = {
@@ -31,7 +33,7 @@ export function healthUrl(baseUrl = ''): string {
 }
 
 export async function fetchHealth(baseUrl = ''): Promise<HealthResponse> {
-  const response = await fetch(healthUrl(baseUrl), { credentials: 'include' });
+  const response = await apiFetch('/api/v1/health', { baseUrl });
   if (!response.ok) {
     throw new Error(`Health check failed: ${response.status}`);
   }

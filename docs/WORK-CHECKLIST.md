@@ -15,17 +15,15 @@ CI and local scripts **must fail** below these floors. Details: [TESTING.md](TES
 
 ## Phase 0 — Foundations
 
-Gate: Slim serves health JSON; Svelte static build is copied into `public/`; global sqlite migrates on boot (migrator still pending).
+Gate: Slim serves health JSON; Svelte static build is copied into `public/`; global sqlite migrates on boot; crypto + user-db wrap exist and are tested; frontend shell is 360px + bottom tabs.
 
 - [x] Monorepo: backend (composer Slim 4, php-di, vlucas/phpdotenv) + frontend (SvelteKit adapter-static)
 - [x] Env: `CIMT_MASTER_KEY`, `GOOGLE_CLIENT_ID`/`SECRET`, `GOOGLE_REDIRECT_URI`, `DATA_DIR`, `APP_URL`, `SESSION_SECURE`
-- [ ] Global migrator + peptide_types seed (semaglutide, tirzepatide, retatrutide, liraglutide)
-- [ ] Crypto service: AMK load, DEK mint, secretbox wrap/unwrap, secretstream file wrap
-- [ ] User DB template migrator; atomic encrypt/decrypt with flock + tmpfs
+- [x] Global migrator + peptide_types seed (semaglutide, tirzepatide, retatrutide, liraglutide)
+- [x] Crypto service: AMK load, DEK mint, secretbox wrap/unwrap, secretstream file wrap
+- [x] User DB template migrator; atomic encrypt/decrypt with flock + tmpfs
 - [x] Slim `GET /api/v1/health`; SPA fallback for non-API GET; CORS not needed (same origin)
-- [ ] Frontend shell from first paint: 360px column, viewport-fit=cover, safe-area padding, bottom tab bar, API client with credentials
-  - Done now: viewport-fit=cover, 430px column, health client with `credentials: 'include'`
-  - Still pending: bottom tab bar and full 360px chrome (Phase 0 remainder / Phase 3)
+- [x] Frontend shell from first paint: 360px column, viewport-fit=cover, safe-area padding, bottom tab bar, API client with credentials
 
 ## Phase 1 — Accounts, Google, encrypted stores
 
