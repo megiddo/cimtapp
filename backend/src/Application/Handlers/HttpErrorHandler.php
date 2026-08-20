@@ -6,6 +6,11 @@ namespace App\Application\Handlers;
 
 use App\Application\Actions\ActionError;
 use App\Application\Actions\ActionPayload;
+use App\Domain\Auth\AuthenticationException;
+use App\Domain\Auth\AuthConfig;
+use App\Domain\Auth\ValidationException;
+use App\Domain\Crypto\CryptoException;
+use App\Infrastructure\Persistence\UserStoreLockedException;
 use Psr\Http\Message\ResponseInterface as Response;
 use Slim\Exception\HttpBadRequestException;
 use Slim\Exception\HttpException;
@@ -27,7 +32,26 @@ class HttpErrorHandler extends SlimErrorHandler
             'An internal error has occurred while processing your request.'
         );
 
-        if ($exception instanceof HttpException) {
+        if ($exception instanceof ValidationException) {
+            $statusCode = 422;
+            $error = new ActionError(
+                ActionError::VALIDATION_ERROR,
+                $exception->getMessage(),
+                $exception->fields()
+            );
+        } elseif ($exception instanceof AuthenticationException) {
+            $statusCode = 401;
+            $error = new ActionError(ActionError::UNAUTHENTICATED, $exception->getMessage());
+        } elseif ($exception instanceof UserStoreLockedException) {
+            $statusCode = 503;
+            $error = new ActionError(ActionError::SERVICE_UNAVAILABLE, AuthConfig::STORE_BUSY);
+        } elseif ($exception instanceof CryptoException) {
+            $statusCode = 500;
+            $error = new ActionError(
+                ActionError::SERVER_ERROR,
+                'An internal error has occurred while processing your request.'
+            );
+        } elseif ($exception instanceof HttpException) {
             $statusCode = $exception->getCode();
             $error->setDescription($exception->getMessage());
 
@@ -43,11 +67,17 @@ class HttpErrorHandler extends SlimErrorHandler
                 $error->setType(ActionError::BAD_REQUEST);
             } elseif ($exception instanceof HttpNotImplementedException) {
                 $error->setType(ActionError::NOT_IMPLEMENTED);
+            } elseif ($statusCode === 503) {
+                $error->setType(ActionError::SERVICE_UNAVAILABLE);
             }
         }
 
         if (
             !($exception instanceof HttpException)
+            && !($exception instanceof ValidationException)
+            && !($exception instanceof AuthenticationException)
+            && !($exception instanceof UserStoreLockedException)
+            && !($exception instanceof CryptoException)
             && $this->displayErrorDetails
         ) {
             $error->setDescription($exception->getMessage());

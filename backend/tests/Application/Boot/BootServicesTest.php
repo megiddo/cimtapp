@@ -25,7 +25,7 @@ class BootServicesTest extends TestCase
                     dirname(__DIR__, 3) . '/migrations/global',
                 )
             );
-            $this->assertSame(2, $boot->boot());
+            $this->assertSame(3, $boot->boot());
             $this->assertSame(0, $boot->boot());
             $this->assertFileExists($dir . '/global.sqlite');
         } finally {

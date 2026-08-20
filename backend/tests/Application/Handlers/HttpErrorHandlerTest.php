@@ -126,4 +126,109 @@ class HttpErrorHandlerTest extends TestCase
         $this->assertSame(ActionError::SERVER_ERROR, $payload['error']['type']);
         $this->assertSame('oops', $payload['error']['description']);
     }
+
+    public function testValidationExceptionIs422WithFields(): void
+    {
+        $app = AppFactory::create();
+        $request = $this->createRequest('GET', '/x');
+        $handler = new HttpErrorHandler(
+            $app->getCallableResolver(),
+            $app->getResponseFactory(),
+            new NullLogger()
+        );
+        $exception = new \App\Domain\Auth\ValidationException(['email' => ['taken']]);
+        $response = $handler($request, $exception, true, false, false);
+        $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame(ActionError::VALIDATION_ERROR, $payload['error']['type']);
+        $this->assertSame(['email' => ['taken']], $payload['error']['fields']);
+    }
+
+    public function testAuthenticationExceptionIs401(): void
+    {
+        $app = AppFactory::create();
+        $request = $this->createRequest('GET', '/x');
+        $handler = new HttpErrorHandler(
+            $app->getCallableResolver(),
+            $app->getResponseFactory(),
+            new NullLogger()
+        );
+        $response = $handler(
+            $request,
+            new \App\Domain\Auth\AuthenticationException('Invalid email or password'),
+            true,
+            false,
+            false
+        );
+        $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(401, $response->getStatusCode());
+        $this->assertSame(ActionError::UNAUTHENTICATED, $payload['error']['type']);
+        $this->assertSame('Invalid email or password', $payload['error']['description']);
+    }
+
+    public function testUserStoreLockedIs503(): void
+    {
+        $app = AppFactory::create();
+        $request = $this->createRequest('GET', '/x');
+        $handler = new HttpErrorHandler(
+            $app->getCallableResolver(),
+            $app->getResponseFactory(),
+            new NullLogger()
+        );
+        $response = $handler(
+            $request,
+            new \App\Infrastructure\Persistence\UserStoreLockedException('locked-secret'),
+            true,
+            false,
+            false
+        );
+        $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(503, $response->getStatusCode());
+        $this->assertSame(ActionError::SERVICE_UNAVAILABLE, $payload['error']['type']);
+        $this->assertSame(\App\Domain\Auth\AuthConfig::STORE_BUSY, $payload['error']['description']);
+        $this->assertStringNotContainsString('locked-secret', (string) $response->getBody());
+    }
+
+    public function testCryptoExceptionHidesDetailsEvenWhenDisplayed(): void
+    {
+        $app = AppFactory::create();
+        $request = $this->createRequest('GET', '/x');
+        $handler = new HttpErrorHandler(
+            $app->getCallableResolver(),
+            $app->getResponseFactory(),
+            new NullLogger()
+        );
+        $response = $handler(
+            $request,
+            new \App\Domain\Crypto\CryptoException('nonce=abc dek=fff'),
+            true,
+            false,
+            false
+        );
+        $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(500, $response->getStatusCode());
+        $this->assertSame(ActionError::SERVER_ERROR, $payload['error']['type']);
+        $this->assertSame(
+            'An internal error has occurred while processing your request.',
+            $payload['error']['description']
+        );
+        $this->assertStringNotContainsString('dek=', (string) $response->getBody());
+        $this->assertStringNotContainsString('nonce=', (string) $response->getBody());
+    }
+
+    public function testHttp503MapsToServiceUnavailableType(): void
+    {
+        $app = AppFactory::create();
+        $request = $this->createRequest('GET', '/x');
+        $handler = new HttpErrorHandler(
+            $app->getCallableResolver(),
+            $app->getResponseFactory(),
+            new NullLogger()
+        );
+        $exception = new \Slim\Exception\HttpException($request, 'busy', 503);
+        $response = $handler($request, $exception, true, false, false);
+        $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(503, $response->getStatusCode());
+        $this->assertSame(ActionError::SERVICE_UNAVAILABLE, $payload['error']['type']);
+    }
 }

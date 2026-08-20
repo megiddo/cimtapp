@@ -39,18 +39,28 @@ Future (not v1): wrap DEK with Argon2id from the user password for password-only
 
 ## Auth (Phase 1)
 
-Email is the account primary key (normalized lowercase). Password and Google are methods on the same row.
+Email is the account primary key (normalized `strtolower(trim)`). Password and Google are methods on the same row.
 
-- Register with password: create user, Argon2id, mint DEK, write empty encrypted store, set session.
-- Login with password: verify hash in global DB; open user store; refresh last_login.
-- Google, new email: create user with `google_sub`, null password_hash, same provisioning.
-- Google, existing email: attach `google_sub` if empty; require `email_verified`.
-- Password signup when Google email exists: reject duplicate.
-- Set password later from settings.
+- Register with password: validate, Argon2id (`PASSWORD_ARGON2ID`), mint DEK, wrap with AMK, insert `users`, `UserStore::create`, seed identity + default syringe inside `withUnlocked`, set session cookie.
+- Password minimum: **12 characters**. Documented here and in `App\Domain\Auth\AuthConfig::PASSWORD_MIN_LENGTH`.
+- Login with password: Argon2id verify. Unknown email and bad password share the copy **“Invalid email or password”** (HTTP 401). Google-only accounts cannot password-login until they set a password. Refresh `last_login_at`.
+- Google, new email: create user with `google_sub`, null `password_hash`, same provisioning. Authorization code + PKCE (S256); server exchanges the code. `email_verified` is required.
+- Google, existing email: attach `google_sub` if empty; sign into that account. If `google_sub` already belongs to a different user, fail safely (302 back to `/login?error=google`, no merge).
+- Password signup when that email exists (Google or password): **422** `{ "email": ["Email is already registered."] }` — no extra hint that distinguishes Google vs password.
+- Set password once authed: `POST /me/password`. Hashes into global `users` and mirrors the `account` snapshot in the user sqlite.
 
-Session: opaque id, HttpOnly / Secure / SameSite=Lax cookie, server table with expiry. No JWT in v1.
+Session: opaque **32-byte hex** id (64 hex chars) in cookie **`cimtapp_session`**. Flags: HttpOnly, SameSite=Lax, Path=/, Secure from `SESSION_SECURE`. Server table `sessions` with **14-day sliding expiry** (each authenticated request extends `expires_at`). No JWT.
 
-Each user sqlite includes an `account` snapshot (email, password hash, google_sub). A decrypted file is a self-contained export. Migration is copy `global.sqlite` + `users/*.enc` + AMK.
+Request unlock path for protected routes (`/me`, later domain):
+
+1. `SessionAuthMiddleware` reads the cookie, loads a non-expired session, loads the user, unwraps the DEK with the AMK, touches sliding expiry, attaches `AuthContext` (user, DEK, session).
+2. `AuthenticatedAction` opens `UserStore::withUnlocked` **around** `action()`, so the handler runs inside the lock/decrypt window. The PDO is closed and the file re-encrypted when the callback returns.
+
+`UserStoreLockedException` → HTTP **503** `{ type: SERVICE_UNAVAILABLE }`. `CryptoException` → **500** with a generic description (never keys). Missing/invalid session → **401**.
+
+Google HTTP is mocked in tests via `GoogleOAuthClient` (fake implementation). The SPA never sees `GOOGLE_CLIENT_SECRET`. `GET /auth/google/start` returns **503** if Google is not configured.
+
+Each user sqlite includes an `account` snapshot (email, password hash, google_sub) and one default syringe **0.5 mL / 50 IU** (`is_default = 1`). Ciphertext path: `{DATA_DIR}/users/{uuid}.sqlite.enc`.
 
 ## Schema sketch
 
@@ -59,7 +69,7 @@ Each user sqlite includes an `account` snapshot (email, password hash, google_su
 - `users`: id UUID, email unique lowercase, password_hash Argon2id nullable, google_sub unique nullable, encrypted_dek, dek_nonce, created_at, last_login_at
 - `sessions`: id opaque 32-byte hex, user_id, expires_at (14d), created_at
 - `peptide_types`: slug (`semaglutide`, `tirzepatide`, `retatrutide`, `liraglutide`), name, is_active, sort_order
-- `oauth_states`: state CSRF nonce, expires_at 10 min, redirect_after
+- `oauth_states`: state CSRF nonce, expires_at 10 min, redirect_after, code_verifier (PKCE)
 
 **Per-user** (applied from `migrations/user` at account create; peptide catalog denormalized onto each compound):
 
@@ -72,17 +82,34 @@ Active compound = latest `compounded_at`. Remainder UI always means that row. Af
 
 ## API (`/api/v1`, JSON, cookie auth)
 
-Validation errors: 422 with field map. Unauthenticated: 401.
+Validation errors: **422** with a field map on `error.fields`. Unauthenticated: **401**.
+
+```json
+{
+  "statusCode": 422,
+  "error": {
+    "type": "VALIDATION_ERROR",
+    "description": "Validation failed.",
+    "fields": {
+      "email": ["Email is already registered."],
+      "password": ["Password must be at least 12 characters."]
+    }
+  }
+}
+```
+
+Success bodies stay `{ "statusCode": 201, "data": { ... } }`. `GET /me` data is `{ email, has_password, has_google, remainder }` — `remainder` is `null` until Phase 2. DEK / nonce / ciphertext never appear.
 
 | Method | Path | Role |
 | --- | --- | --- |
-| GET | `/health` | liveness `{ "status": "ok" }` (this milestone) |
-| POST | `/auth/register` | email + password |
-| POST | `/auth/login` | email + password |
-| POST | `/auth/logout` | clear session |
-| GET | `/auth/google/start` | 302 to Google |
-| GET | `/auth/google/callback` | exchange, set cookie, 302 SPA |
-| GET | `/me` | identity + remainder summary |
+| GET | `/health` | liveness `{ "status": "ok" }` |
+| POST | `/auth/register` | email + password → session cookie |
+| POST | `/auth/login` | email + password → session cookie |
+| POST | `/auth/logout` | clear session row + expire cookie (idempotent) |
+| GET | `/auth/google/start` | 302 to Google (full page; PKCE + state) |
+| GET | `/auth/google/callback` | exchange code, set cookie, 302 to `/` |
+| GET | `/me` | identity + remainder summary (auth) |
+| POST | `/me/password` | set or change password (auth) |
 | GET | `/peptide-types` | global catalog |
 | GET/POST | `/syringes` | list / create |
 | PATCH | `/syringes/{id}` | label, default flag |
@@ -116,7 +143,7 @@ Phone layout is the product. Design floor 360px (SE). Max content width 430px, s
 
 Viewport (this milestone): `width=device-width, initial-scale=1, viewport-fit=cover`. Tab bar and sticky CTAs pad `env(safe-area-inset-*)`. Body/inputs 16px so iOS Safari does not zoom.
 
-Authenticated chrome (this milestone): thin top bar + fixed bottom tabs. Login (`/login`) has no tabs. Home gear → `/settings` stub.
+Authenticated chrome: thin top bar + fixed bottom tabs. Login (`/login`) has no tabs. Home gear → `/settings` (set password + logout). Session-gated routes (Home, Log, Vials, History, Settings) redirect to `/login` when `GET /me` is 401. “Continue with Google” is a full-page navigation to `GET /api/v1/auth/google/start` (not XHR) because of the 302.
 
 | Tab | Route | Role |
 | --- | --- | --- |

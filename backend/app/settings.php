@@ -45,6 +45,9 @@ return function (ContainerBuilder $containerBuilder): void {
                 'sessionSecure' => $validated['sessionSecure'],
                 'masterKey' => $validated['masterKey'],
                 'masterKeyConfigured' => true,
+                'googleClientId' => $validated['googleClientId'],
+                'googleClientSecret' => $validated['googleClientSecret'],
+                'googleRedirectUri' => $validated['googleRedirectUri'],
                 'logger' => [
                     'name' => 'cimtapp',
                     'path' => isset($_ENV['docker']) || getenv('docker') ? 'php://stdout' : __DIR__ . '/../logs/app.log',

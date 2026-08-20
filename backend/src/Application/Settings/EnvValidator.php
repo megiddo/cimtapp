@@ -22,7 +22,10 @@ final class EnvValidator
      *     masterKey: string,
      *     dataDir: string,
      *     appUrl: string,
-     *     sessionSecure: bool
+     *     sessionSecure: bool,
+     *     googleClientId: string,
+     *     googleClientSecret: string,
+     *     googleRedirectUri: string
      * }
      */
     public function validate(array $env): array
@@ -57,12 +60,19 @@ final class EnvValidator
             $this->assertGoogleConfigured($env);
         }
 
+        $googleClientId = $this->read($env, 'GOOGLE_CLIENT_ID');
+        $googleClientSecret = $this->read($env, 'GOOGLE_CLIENT_SECRET');
+        $googleRedirectUri = $this->read($env, 'GOOGLE_REDIRECT_URI');
+
         return [
             'appEnv' => $appEnv,
             'masterKey' => $masterKey,
             'dataDir' => $dataDir,
             'appUrl' => rtrim($appUrl, '/'),
             'sessionSecure' => $sessionSecure,
+            'googleClientId' => $googleClientId,
+            'googleClientSecret' => $googleClientSecret,
+            'googleRedirectUri' => $googleRedirectUri,
         ];
     }
 

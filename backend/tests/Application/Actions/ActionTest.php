@@ -145,4 +145,20 @@ class ActionTest extends TestCase
         $error->setDescription(null);
         $this->assertNull($error->getDescription());
     }
+
+    public function testActionErrorSerializesFieldMap(): void
+    {
+        $error = new ActionError(ActionError::VALIDATION_ERROR, 'Validation failed.', [
+            'email' => ['Email is already registered.'],
+        ]);
+        $this->assertSame(['email' => ['Email is already registered.']], $error->getFields());
+        $json = $error->jsonSerialize();
+        $this->assertSame('VALIDATION_ERROR', $json['type']);
+        $this->assertSame(['email' => ['Email is already registered.']], $json['fields']);
+
+        $error->setFields(['password' => ['too short']]);
+        $this->assertSame(['password' => ['too short']], $error->getFields());
+        $error->setFields(null);
+        $this->assertArrayNotHasKey('fields', $error->jsonSerialize());
+    }
 }

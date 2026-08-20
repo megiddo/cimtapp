@@ -29,13 +29,13 @@ Gate: Slim serves health JSON; Svelte static build is copied into `public/`; glo
 
 Gate: register, password login, and Google login (verified email) all produce a session and a decryptable user sqlite that contains the identity snapshot and a default 0.5 mL / 50 IU syringe.
 
-- [ ] `POST /auth/register`: validate email, Argon2id, mint DEK, create encrypted user DB, set session cookie
-- [ ] `POST /auth/login` + `POST /auth/logout`; 401 on bad credentials without user enumeration beyond generic copy
-- [ ] Google start/callback with state nonce; require `email_verified`; link by email or `google_sub`
-- [ ] Email-match rules: Google onto password account; refuse second register; allow set-password from `/me` once authed
-- [ ] Auth middleware: session → unwrap DEK → lock → decrypt → attach PDO → re-encrypt on terminate
-- [ ] `GET /me` returns email, login methods, no DEK material
-- [ ] SPA login/register + Continue with Google; session-gated routes redirect to `/login`
+- [x] `POST /auth/register`: validate email, Argon2id, mint DEK, create encrypted user DB, set session cookie
+- [x] `POST /auth/login` + `POST /auth/logout`; 401 on bad credentials without user enumeration beyond generic copy
+- [x] Google start/callback with state nonce; require `email_verified`; link by email or `google_sub`
+- [x] Email-match rules: Google onto password account; refuse second register; allow set-password from `/me` once authed
+- [x] Auth middleware: session → unwrap DEK → lock → decrypt → attach PDO → re-encrypt on terminate
+- [x] `GET /me` returns email, login methods, no DEK material
+- [x] SPA login/register + Continue with Google; session-gated routes redirect to `/login`
 
 ## Phase 2 — Compounds, uses, burndown
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Persistence;
 
+use App\Domain\Auth\UserStorePort;
 use App\Domain\Crypto\Crypto;
 use App\Domain\Crypto\CryptoException;
 use PDO;
@@ -11,7 +12,7 @@ use PDO;
 /**
  * Exclusive-lock, decrypt to DATA_DIR/tmp, run a callback, re-encrypt, unlock.
  */
-final class UserStore
+final class UserStore implements UserStorePort
 {
     private const USER_ID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
     private const LOCK_POLL_MICROS = 10_000;

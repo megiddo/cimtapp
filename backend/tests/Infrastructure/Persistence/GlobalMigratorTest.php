@@ -31,13 +31,16 @@ class GlobalMigratorTest extends TestCase
     {
         $migrator = $this->migrator();
         $applied = $migrator->migrate();
-        $this->assertSame(2, $applied);
+        $this->assertSame(3, $applied);
         $this->assertFileExists($this->dir . '/global.sqlite');
 
         $pdo = $this->pdo();
         foreach (['users', 'sessions', 'peptide_types', 'oauth_states', 'schema_migrations'] as $table) {
             $this->assertTrue($this->tableExists($pdo, $table), $table . ' should exist');
         }
+        $columns = $pdo->query('PRAGMA table_info(oauth_states)')->fetchAll(PDO::FETCH_ASSOC);
+        $names = array_column($columns, 'name');
+        $this->assertContains('code_verifier', $names);
 
         $rows = $pdo->query(
             'SELECT slug, name, is_active, sort_order FROM peptide_types ORDER BY sort_order, slug'
@@ -55,13 +58,13 @@ class GlobalMigratorTest extends TestCase
     public function testSecondMigrateIsNoOp(): void
     {
         $migrator = $this->migrator();
-        $this->assertSame(2, $migrator->migrate());
+        $this->assertSame(3, $migrator->migrate());
         $this->assertSame(0, $migrator->migrate());
 
         $pdo = $this->pdo();
         $versions = (int) $pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn();
         $peptides = (int) $pdo->query('SELECT COUNT(*) FROM peptide_types')->fetchColumn();
-        $this->assertSame(2, $versions);
+        $this->assertSame(3, $versions);
         $this->assertSame(4, $peptides);
     }
 

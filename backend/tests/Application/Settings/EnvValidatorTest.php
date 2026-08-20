@@ -44,6 +44,9 @@ class EnvValidatorTest extends TestCase
         $this->assertSame('/tmp/cimtapp-data', $result['dataDir']);
         $this->assertSame('http://localhost:8080', $result['appUrl']);
         $this->assertFalse($result['sessionSecure']);
+        $this->assertSame('', $result['googleClientId']);
+        $this->assertSame('', $result['googleClientSecret']);
+        $this->assertSame('', $result['googleRedirectUri']);
     }
 
     public function testValidateStripsTrailingSlashFromAppUrl(): void
@@ -153,6 +156,9 @@ class EnvValidatorTest extends TestCase
 
         $this->assertSame('production', $result['appEnv']);
         $this->assertTrue($result['sessionSecure']);
+        $this->assertSame('id.apps.googleusercontent.com', $result['googleClientId']);
+        $this->assertSame('secret', $result['googleClientSecret']);
+        $this->assertSame('https://cimt.example/api/v1/auth/google/callback', $result['googleRedirectUri']);
         $this->assertTrue($this->validator->requiresGoogleOAuth('production'));
         $this->assertFalse($this->validator->requiresGoogleOAuth('testing'));
         $this->assertFalse($this->validator->requiresGoogleOAuth('development'));

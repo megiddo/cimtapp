@@ -14,6 +14,7 @@ class ActionError implements JsonSerializable
     public const NOT_IMPLEMENTED = 'NOT_IMPLEMENTED';
     public const RESOURCE_NOT_FOUND = 'RESOURCE_NOT_FOUND';
     public const SERVER_ERROR = 'SERVER_ERROR';
+    public const SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE';
     public const UNAUTHENTICATED = 'UNAUTHENTICATED';
     public const VALIDATION_ERROR = 'VALIDATION_ERROR';
     public const VERIFICATION_ERROR = 'VERIFICATION_ERROR';
@@ -22,10 +23,17 @@ class ActionError implements JsonSerializable
 
     private ?string $description;
 
-    public function __construct(string $type, ?string $description = null)
+    /** @var array<string, list<string>>|null */
+    private ?array $fields;
+
+    /**
+     * @param array<string, list<string>>|null $fields
+     */
+    public function __construct(string $type, ?string $description = null, ?array $fields = null)
     {
         $this->type = $type;
         $this->description = $description;
+        $this->fields = $fields;
     }
 
     public function getType(): string
@@ -53,13 +61,36 @@ class ActionError implements JsonSerializable
     }
 
     /**
-     * @return array{type: string, description: ?string}
+     * @return array<string, list<string>>|null
+     */
+    public function getFields(): ?array
+    {
+        return $this->fields;
+    }
+
+    /**
+     * @param array<string, list<string>>|null $fields
+     */
+    public function setFields(?array $fields): self
+    {
+        $this->fields = $fields;
+
+        return $this;
+    }
+
+    /**
+     * @return array{type: string, description: ?string, fields?: array<string, list<string>>}
      */
     public function jsonSerialize(): array
     {
-        return [
+        $payload = [
             'type' => $this->type,
             'description' => $this->description,
         ];
+        if ($this->fields !== null) {
+            $payload['fields'] = $this->fields;
+        }
+
+        return $payload;
     }
 }

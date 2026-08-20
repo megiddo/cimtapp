@@ -2,7 +2,7 @@
 
 Compounded Incretin Mimetic Tracking App: a personal compounding log. Mix a vial, log each use in IU against a named syringe, see milligrams deducted, and watch the active vial burn down.
 
-This repository currently ships **Phase 0 foundations**: Slim 4 JSON API at `/api/v1`, SvelteKit static SPA in `backend/public/`, global sqlite migrated on boot, libsodium crypto, locked/encrypted per-user stores, and a 360px mobile shell. Auth and dose domain land in later stacked branches.
+This repository currently ships **Phase 1 auth**: register, password login, and Google login (verified email) mint a `cimtapp_session` cookie and a decryptable per-user sqlite with an identity snapshot plus a default 0.5 mL / 50 IU syringe. Dose domain lands in later stacked branches.
 
 ## Quick start (Docker)
 
@@ -15,6 +15,8 @@ docker compose up --build
 App URL: **http://localhost:8080**
 
 Health: **http://localhost:8080/api/v1/health** → `{ "status": "ok" }`
+
+Auth (same origin, cookie `cimtapp_session`): `POST /api/v1/auth/register`, `/auth/login`, `/auth/logout`; `GET /api/v1/auth/google/start` (full page); `GET /api/v1/me`. Passwords are Argon2id, minimum 12 characters. Google is mocked in tests — no real `GOOGLE_CLIENT_*` required outside production.
 
 `make up` is equivalent to copying `.env` if missing and running `docker compose up --build`. Bind-mounts `backend/` for PHP edits. SQLite files persist in the `cimtapp-data` volume at `/var/www/cimtapp/data`. Decrypted user sqlite is written only under `DATA_DIR/tmp` (`/var/www/cimtapp/data/tmp` in Docker, tmpfs-mounted).
 
