@@ -19,9 +19,11 @@ use App\Domain\Auth\UserProvisioner;
 use App\Domain\Auth\UserStorePort;
 use App\Domain\Crypto\AmkRotator;
 use App\Domain\Crypto\Crypto;
+use App\Domain\Dose\BacBottleService;
 use App\Domain\Dose\CompoundService;
 use App\Domain\Dose\DoseCalculator;
 use App\Domain\Dose\PeptideCatalog;
+use App\Domain\Dose\UserPeptideService;
 use App\Domain\Dose\SyringeService;
 use App\Domain\Dose\UseService;
 use App\Infrastructure\Http\FileGetContentsHttpTransport;
@@ -103,11 +105,26 @@ return function (ContainerBuilder $containerBuilder): void {
         SyringeService::class => static function (ContainerInterface $c): SyringeService {
             return new SyringeService($c->get(IdGenerator::class));
         },
+        BacBottleService::class => static function (ContainerInterface $c): BacBottleService {
+            return new BacBottleService(
+                $c->get(DoseCalculator::class),
+                $c->get(IdGenerator::class),
+                $c->get(Clock::class),
+            );
+        },
+        UserPeptideService::class => static function (ContainerInterface $c): UserPeptideService {
+            return new UserPeptideService(
+                $c->get(PeptideCatalog::class),
+                $c->get(IdGenerator::class),
+                $c->get(Clock::class),
+            );
+        },
         CompoundService::class => static function (ContainerInterface $c): CompoundService {
             return new CompoundService(
                 $c->get(DoseCalculator::class),
-                $c->get(PeptideCatalog::class),
+                $c->get(UserPeptideService::class),
                 $c->get(SyringeService::class),
+                $c->get(BacBottleService::class),
                 $c->get(IdGenerator::class),
                 $c->get(Clock::class),
             );

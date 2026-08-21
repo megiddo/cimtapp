@@ -80,8 +80,9 @@ final class UserStore implements UserStorePort
                 throw $e;
             }
 
-            $pdo = $this->openPdo($plainPath);
             try {
+                $this->userMigrator->migrate($plainPath);
+                $pdo = $this->openPdo($plainPath);
                 $result = $callback($pdo);
             } catch (\Throwable $e) {
                 $pdo = null;

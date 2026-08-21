@@ -20,6 +20,6 @@ describe('remainder tone', () => {
     expect(remainderTone(-0.01, 10)).toBe('danger');
     expect(remainderTone(1, 0)).toBe('danger');
     expect(remainingFraction(1, 0)).toBe(0);
-    expect(remainderToneMessage('danger')).toBe('Vial empty — mix a new compound.');
+    expect(remainderToneMessage('danger')).toBe('Empty — add to inventory.');
   });
 });

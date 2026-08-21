@@ -38,6 +38,27 @@ export function isPositiveIu(iu: number): boolean {
   return Number.isFinite(iu) && iu > 0 && hasAtMostOneDecimal(iu);
 }
 
+export function waterNeededPerBottle(
+  peptideMg: number,
+  targetMg: number,
+  targetIu: number,
+  syringeVolumeMl: number,
+  syringeCapacityIu: number
+): number | null {
+  if (!(peptideMg > 0) || !(targetMg > 0) || !(targetIu > 0)) {
+    return null;
+  }
+  if (!(syringeVolumeMl > 0) || !(syringeCapacityIu > 0)) {
+    return null;
+  }
+  const shotMl = volumeMl(targetIu, syringeVolumeMl, syringeCapacityIu);
+  if (!(shotMl > 0)) {
+    return null;
+  }
+
+  return roundVolume((peptideMg * shotMl) / targetMg);
+}
+
 export function concentration(peptideMg: number, bacWaterMl: number): number {
   return peptideMg / bacWaterMl;
 }

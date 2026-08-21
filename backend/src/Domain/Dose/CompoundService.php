@@ -15,8 +15,9 @@ final class CompoundService
 {
     public function __construct(
         private readonly DoseCalculator $doses,
-        private readonly PeptideCatalog $peptides,
+        private readonly UserPeptideService $peptides,
         private readonly SyringeService $syringes,
+        private readonly BacBottleService $bacBottles,
         private readonly IdGenerator $ids,
         private readonly Clock $clock,
     ) {
@@ -129,21 +130,22 @@ final class CompoundService
      */
     public function create(PDO $pdo, FieldParser $fields): array
     {
-        $peptide = $this->requirePeptide($fields->requireString('peptide_type_id'));
+        $peptide = $this->peptides->require($pdo, $fields->requireString('peptide_type_id'));
         $peptideMg = $this->doses->roundMg($fields->requirePositiveFloat('peptide_mg'));
         $bacWaterMl = $fields->requirePositiveFloat('bac_water_ml');
         $compoundedAt = $fields->requireDatetime('compounded_at');
         $notes = $fields->optionalString('notes');
         $id = $this->ids->uuid();
         $now = $this->timestamp();
+        $bottleId = $this->bacBottles->debitCurrent($pdo, $bacWaterMl);
 
         $stmt = $pdo->prepare(
             'INSERT INTO compounds (
                 id, peptide_type_id, peptide_type_slug, peptide_type_name,
-                peptide_mg, bac_water_ml, compounded_at, notes, created_at
+                peptide_mg, bac_water_ml, compounded_at, notes, created_at, bac_bottle_id
              ) VALUES (
                 :id, :peptide_type_id, :peptide_type_slug, :peptide_type_name,
-                :peptide_mg, :bac_water_ml, :compounded_at, :notes, :created_at
+                :peptide_mg, :bac_water_ml, :compounded_at, :notes, :created_at, :bac_bottle_id
              )'
         );
         $stmt->execute([
@@ -156,57 +158,52 @@ final class CompoundService
             ':compounded_at' => $compoundedAt,
             ':notes' => $notes,
             ':created_at' => $now,
+            ':bac_bottle_id' => $bottleId,
         ]);
 
         return $this->get($pdo, $id);
     }
 
     /**
+     * Mix fields stay editable after uses. Changing mg or BAC recalculates stored use mg.
+     *
      * @return array<string, mixed>
      */
     public function patch(PDO $pdo, string $id, FieldParser $fields): array
     {
         $existing = $this->get($pdo, $id);
-        $locked = $this->hasUses($pdo, $id);
 
-        $peptideTypeId = $existing['peptide_type_id'];
-        $peptideMg = $existing['peptide_mg'];
-        $bacWaterMl = $existing['bac_water_ml'];
-        $errors = [];
-
-        if ($fields->has('peptide_type_id')) {
-            $requested = $fields->requireString('peptide_type_id');
-            if ($locked && $requested !== $peptideTypeId) {
-                $errors['peptide_type_id'] = [DoseConfig::PEPTIDE_LOCKED];
-            } elseif (!$locked) {
-                $peptideTypeId = $requested;
-            }
-        }
-        if ($fields->has('peptide_mg')) {
-            $requestedMg = $this->doses->roundMg($fields->requirePositiveFloat('peptide_mg'));
-            if ($locked && $this->doses->roundMg((float) $peptideMg) !== $requestedMg) {
-                $errors['peptide_mg'] = [DoseConfig::MG_LOCKED];
-            } elseif (!$locked) {
-                $peptideMg = $requestedMg;
-            }
-        }
-        if ($fields->has('bac_water_ml')) {
-            $requestedBac = $fields->requirePositiveFloat('bac_water_ml');
-            if ($locked && abs((float) $bacWaterMl - $requestedBac) > 1e-9) {
-                $errors['bac_water_ml'] = [DoseConfig::BAC_LOCKED];
-            } elseif (!$locked) {
-                $bacWaterMl = $requestedBac;
-            }
-        }
-        if ($errors !== []) {
-            throw new ValidationException($errors);
-        }
-
-        $peptide = $this->requirePeptide((string) $peptideTypeId);
+        $peptideTypeId = $fields->has('peptide_type_id')
+            ? $fields->requireString('peptide_type_id')
+            : (string) $existing['peptide_type_id'];
+        $peptideMg = $fields->has('peptide_mg')
+            ? $this->doses->roundMg($fields->requirePositiveFloat('peptide_mg'))
+            : $this->doses->roundMg((float) $existing['peptide_mg']);
+        $bacWaterMl = $fields->has('bac_water_ml')
+            ? $fields->requirePositiveFloat('bac_water_ml')
+            : (float) $existing['bac_water_ml'];
         $compoundedAt = $fields->has('compounded_at')
             ? $fields->requireDatetime('compounded_at')
             : (string) $existing['compounded_at'];
         $notes = $fields->has('notes') ? $fields->optionalString('notes') : $existing['notes'];
+
+        $mixChanged = $this->doses->roundMg((float) $existing['peptide_mg']) !== $peptideMg
+            || abs((float) $existing['bac_water_ml'] - $bacWaterMl) > 1e-9;
+        if ($mixChanged) {
+            $this->assertMixFitsUses($pdo, $id, $peptideMg, $bacWaterMl);
+        }
+
+        $bottleId = $existing['bac_bottle_id'] === null ? null : (string) $existing['bac_bottle_id'];
+        if (abs((float) $existing['bac_water_ml'] - $bacWaterMl) > 1e-9) {
+            $bottleId = $this->bacBottles->applyMixDelta(
+                $pdo,
+                $bottleId,
+                (float) $existing['bac_water_ml'],
+                $bacWaterMl,
+            );
+        }
+
+        $peptide = $this->peptides->require($pdo, $peptideTypeId);
 
         $stmt = $pdo->prepare(
             'UPDATE compounds SET
@@ -216,7 +213,8 @@ final class CompoundService
                 peptide_mg = :peptide_mg,
                 bac_water_ml = :bac_water_ml,
                 compounded_at = :compounded_at,
-                notes = :notes
+                notes = :notes,
+                bac_bottle_id = :bac_bottle_id
              WHERE id = :id'
         );
         $stmt->execute([
@@ -228,9 +226,31 @@ final class CompoundService
             ':bac_water_ml' => $bacWaterMl,
             ':compounded_at' => $compoundedAt,
             ':notes' => $notes,
+            ':bac_bottle_id' => $bottleId,
         ]);
 
+        if ($mixChanged) {
+            $this->syncUseDoses($pdo, $id, $peptideMg, $bacWaterMl);
+        }
+
         return $this->get($pdo, $id);
+    }
+
+    public function delete(PDO $pdo, string $id): void
+    {
+        $row = $this->findRow($pdo, $id);
+        if ($row === null) {
+            throw new DomainRecordNotFoundException(DoseConfig::COMPOUND_UNKNOWN);
+        }
+        if ($this->hasUses($pdo, $id)) {
+            throw new ValidationException(['id' => [DoseConfig::COMPOUND_HAS_USES]], DoseConfig::COMPOUND_HAS_USES);
+        }
+
+        $bottleId = $row['bac_bottle_id'] === null ? null : (string) $row['bac_bottle_id'];
+        $this->bacBottles->credit($pdo, $bottleId, (float) $row['bac_water_ml']);
+
+        $stmt = $pdo->prepare('DELETE FROM compounds WHERE id = :id');
+        $stmt->execute([':id' => $id]);
     }
 
     /**
@@ -286,6 +306,7 @@ final class CompoundService
             'compounded_at' => (string) $row['compounded_at'],
             'notes' => $row['notes'] === null ? null : (string) $row['notes'],
             'created_at' => (string) $row['created_at'],
+            'bac_bottle_id' => $row['bac_bottle_id'] === null ? null : (string) $row['bac_bottle_id'],
             'has_uses' => $this->hasUses($pdo, $id),
             'remaining_mg' => $remainder->remainingMg,
             'remaining_ml' => $remainder->remainingMl,
@@ -294,17 +315,70 @@ final class CompoundService
         ];
     }
 
-    /**
-     * @return array{id: string, slug: string, name: string, sort_order: int}
-     */
-    private function requirePeptide(string $id): array
+    private function assertMixFitsUses(PDO $pdo, string $compoundId, float $peptideMg, float $bacWaterMl): void
     {
-        $peptide = $this->peptides->findActiveById($id);
-        if ($peptide === null) {
-            throw new ValidationException(['peptide_type_id' => [DoseConfig::PEPTIDE_UNKNOWN]]);
+        $used = $this->doses->roundMg($this->recalculatedUsedMg($pdo, $compoundId, $peptideMg, $bacWaterMl));
+        if (!$this->doses->exceedsRemainder($used, $peptideMg)) {
+            return;
         }
 
-        return $peptide;
+        throw new ValidationException(
+            ['peptide_mg' => [DoseConfig::COMPOUND_OVERDRAW]],
+            DoseConfig::COMPOUND_OVERDRAW,
+        );
+    }
+
+    private function syncUseDoses(PDO $pdo, string $compoundId, float $peptideMg, float $bacWaterMl): void
+    {
+        $now = $this->timestamp();
+        $update = $pdo->prepare(
+            'UPDATE uses SET volume_ml = :volume_ml, peptide_mg = :peptide_mg, updated_at = :updated_at WHERE id = :id'
+        );
+        foreach ($this->useDoseRows($pdo, $compoundId) as $row) {
+            $iu = (float) $row['iu'];
+            $volumeMl = (float) $row['syringe_volume_ml'];
+            $capacityIu = (float) $row['syringe_capacity_iu'];
+            $update->execute([
+                ':id' => $row['id'],
+                ':volume_ml' => $this->doses->volumeMl($iu, $volumeMl, $capacityIu),
+                ':peptide_mg' => $this->doses->peptideMg($iu, $peptideMg, $bacWaterMl, $volumeMl, $capacityIu),
+                ':updated_at' => $now,
+            ]);
+        }
+    }
+
+    private function recalculatedUsedMg(
+        PDO $pdo,
+        string $compoundId,
+        float $peptideMg,
+        float $bacWaterMl,
+    ): float {
+        $used = 0.0;
+        foreach ($this->useDoseRows($pdo, $compoundId) as $row) {
+            $used += $this->doses->peptideMg(
+                (float) $row['iu'],
+                $peptideMg,
+                $bacWaterMl,
+                (float) $row['syringe_volume_ml'],
+                (float) $row['syringe_capacity_iu'],
+            );
+        }
+
+        return $used;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function useDoseRows(PDO $pdo, string $compoundId): array
+    {
+        $stmt = $pdo->prepare(
+            'SELECT id, iu, syringe_volume_ml, syringe_capacity_iu FROM uses WHERE compound_id = :id'
+        );
+        $stmt->execute([':id' => $compoundId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return is_array($rows) ? $rows : [];
     }
 
     private function timestamp(): string

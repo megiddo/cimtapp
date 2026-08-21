@@ -24,8 +24,8 @@
   <p class="muted">Loading…</p>
 {:else if !current}
   <div class="empty-state">
-    <p>Mix a vial to start tracking remainder.</p>
-    <a class="chip" href="/inventory/new">Mix vial</a>
+    <p>Add to inventory to start tracking remainder.</p>
+    <a class="chip" href="/inventory/new">Add to Inventory</a>
   </div>
 {:else}
   <section class="hero {tone}">
@@ -42,7 +42,7 @@
   </section>
 
   {#if tone === 'danger'}
-    <a class="chip" href="/inventory/new">Mix vial</a>
+    <a class="chip" href="/inventory/new">Add to Inventory</a>
   {:else if last}
     <a class="chip" href="/use/new?iu={last.iu}">Log {formatIu(last.iu)} IU again</a>
   {/if}

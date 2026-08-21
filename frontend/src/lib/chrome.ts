@@ -5,7 +5,7 @@ export const ROW_MIN_PX = 56;
 export const INPUT_FONT_PX = 16;
 export const TAB_BAR_HEIGHT_PX = 56;
 
-export type TabId = 'home' | 'log' | 'vials' | 'history';
+export type TabId = 'home' | 'log' | 'inventory' | 'history';
 
 export type NavTab = {
   id: TabId;
@@ -17,7 +17,7 @@ export type NavTab = {
 export const NAV_TABS: readonly NavTab[] = [
   { id: 'home', href: '/', label: 'Home', emphasized: false },
   { id: 'log', href: '/use/new', label: 'Log', emphasized: true },
-  { id: 'vials', href: '/inventory', label: 'Vials', emphasized: false },
+  { id: 'inventory', href: '/inventory', label: 'Inventory', emphasized: false },
   { id: 'history', href: '/history', label: 'History', emphasized: false }
 ];
 
@@ -41,14 +41,30 @@ export function titleForPath(pathname: string): string {
   if (pathname === '/') {
     return 'Home';
   }
-  if (pathname === '/inventory/new') {
-    return 'Mix';
-  }
   if (pathname === '/use/new' || pathname.startsWith('/use/')) {
     return 'Log';
   }
+  if (pathname === '/inventory/new') {
+    return 'Add';
+  }
+  if (pathname === '/inventory/water/new') {
+    return 'Add BAC';
+  }
+  if (pathname === '/inventory/syringes/new') {
+    return 'Add syringe';
+  }
+  if (pathname === '/inventory/peptides/new') {
+    return 'Add peptide';
+  }
+  if (
+    /^\/inventory\/water\/[^/]+$/.test(pathname) ||
+    /^\/inventory\/syringes\/[^/]+$/.test(pathname) ||
+    /^\/inventory\/[^/]+$/.test(pathname)
+  ) {
+    return 'Edit';
+  }
   if (pathname === '/inventory' || pathname.startsWith('/inventory/')) {
-    return 'Vials';
+    return 'Inventory';
   }
   if (/^\/history\/[^/]+$/.test(pathname)) {
     return 'Edit';
@@ -67,7 +83,15 @@ export function titleForPath(pathname: string): string {
 }
 
 export function backHrefForPath(pathname: string): string | null {
-  if (pathname === '/inventory/new') {
+  if (
+    pathname === '/inventory/new' ||
+    pathname === '/inventory/water/new' ||
+    pathname === '/inventory/syringes/new' ||
+    pathname === '/inventory/peptides/new' ||
+    /^\/inventory\/water\/[^/]+$/.test(pathname) ||
+    /^\/inventory\/syringes\/[^/]+$/.test(pathname) ||
+    /^\/inventory\/[^/]+$/.test(pathname)
+  ) {
     return '/inventory';
   }
   if (/^\/history\/[^/]+$/.test(pathname)) {
@@ -82,6 +106,12 @@ export function needsStickyCta(pathname: string): boolean {
     pathname === '/use/new' ||
     pathname === '/inventory' ||
     pathname === '/inventory/new' ||
+    pathname === '/inventory/water/new' ||
+    pathname === '/inventory/syringes/new' ||
+    pathname === '/inventory/peptides/new' ||
+    /^\/inventory\/water\/[^/]+$/.test(pathname) ||
+    /^\/inventory\/syringes\/[^/]+$/.test(pathname) ||
+    /^\/inventory\/[^/]+$/.test(pathname) ||
     /^\/history\/[^/]+$/.test(pathname)
   );
 }

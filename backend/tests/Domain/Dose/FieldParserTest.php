@@ -95,6 +95,30 @@ class FieldParserTest extends TestCase
         $this->assertNull(FieldParser::from(['n' => null])->optionalFloat('n'));
     }
 
+    public function testPositiveIntRules(): void
+    {
+        $this->assertSame(3, FieldParser::from(['n' => 3])->requirePositiveInt('n'));
+        $this->assertSame(4, FieldParser::from(['n' => '4'])->requirePositiveInt('n'));
+        $this->assertSame(5, FieldParser::from(['n' => 5.0])->requirePositiveInt('n'));
+        $this->assertSame(2, FieldParser::from(['n' => 2])->optionalPositiveInt('n'));
+        $this->assertNull(FieldParser::from(['n' => null])->optionalPositiveInt('n'));
+        $this->assertNull(FieldParser::from([])->optionalPositiveInt('n'));
+
+        try {
+            FieldParser::from(['n' => 0])->requirePositiveInt('n');
+            $this->fail('expected');
+        } catch (ValidationException $e) {
+            $this->assertSame(['n' => [DoseConfig::MUST_BE_WHOLE]], $e->fields());
+        }
+
+        try {
+            FieldParser::from(['n' => 1.5])->requirePositiveInt('n');
+            $this->fail('expected');
+        } catch (ValidationException $e) {
+            $this->assertSame(['n' => [DoseConfig::MUST_BE_WHOLE]], $e->fields());
+        }
+    }
+
     public function testBoolAndDatetime(): void
     {
         $this->assertTrue(FieldParser::from(['f' => true])->optionalBool('f'));

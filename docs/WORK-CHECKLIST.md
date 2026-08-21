@@ -43,7 +43,8 @@ Gate: mix a vial, log a use in IU, see mg and remainder, edit the use, and get a
 
 - [x] `DoseCalculator` domain service + unit tests for U-100 and non-U-100 syringes
 - [x] `GET /peptide-types`; `GET/POST /compounds`; `GET /compounds/current` with computed remainder
-- [x] Compound immutability after first use (mg and BAC locked)
+- [x] Compounds stay editable after first use; mix changes recalc stored use mg (422 if uses would overdraw)
+- [x] Delete compound only when unused (422 if the vial has uses)
 - [x] Syringe CRUD; seed default 0.5 mL / 50 IU; snapshot syringe onto each use
 - [x] `POST /uses` against current compound; store iu, volume_ml, peptide_mg; reject overdraw
 - [x] `GET /uses` used_at DESC; `PATCH /uses` recalculates mg and re-checks remainder

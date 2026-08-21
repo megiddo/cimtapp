@@ -6,8 +6,7 @@
     formatDoseLine,
     formatMl,
     parseIuInput,
-    previewDose,
-    stepIu
+    previewDose
   } from '$lib/dose';
   import { nowDatetimeLocal } from '$lib/datetime';
   import { OFFLINE_SAVE_MESSAGE, saveWhileOnline } from '$lib/offline';
@@ -94,18 +93,14 @@
   <p class="muted">Loading…</p>
 {:else if current === null}
   <div class="empty-state">
-    <p>Mix a vial before logging a use.</p>
-    <a class="chip" href="/inventory/new">Mix vial</a>
+    <p>Add to inventory before logging a use.</p>
+    <a class="chip" href="/inventory/new">Add to Inventory</a>
   </div>
 {:else}
   <form class="auth-form has-sticky" onsubmit={onSubmit}>
     <label>
       IU
-      <div class="stepper">
-        <button type="button" aria-label="Decrease IU" disabled={pending} onclick={() => (iuText = String(stepIu(iu ?? 1, -1)))}>−</button>
-        <input inputmode="decimal" name="iu" bind:value={iuText} disabled={pending} />
-        <button type="button" aria-label="Increase IU" disabled={pending} onclick={() => (iuText = String(stepIu(iu ?? 0, 1)))}>+</button>
-      </div>
+      <input inputmode="decimal" name="iu" bind:value={iuText} disabled={pending} />
       {#if iuError}
         <span class="field-error">{iuError}</span>
       {/if}
@@ -119,9 +114,15 @@
       Syringe
       <select bind:value={syringeId}>
         {#each syringes as item (item.id)}
-          <option value={item.id}>{item.label}</option>
+          <option value={item.id}>{item.label} · {item.quantity} left</option>
         {/each}
       </select>
+      {#if syringe && syringe.quantity < 1}
+        <span class="field-error">Restock this syringe type in Inventory before logging.</span>
+      {/if}
+      {#if firstFieldError(fields, 'syringe_id')}
+        <span class="field-error">{firstFieldError(fields, 'syringe_id')}</span>
+      {/if}
     </label>
 
     <div class="below-fold">

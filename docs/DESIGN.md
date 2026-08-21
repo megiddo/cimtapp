@@ -81,7 +81,7 @@ Each user sqlite includes an `account` snapshot (email, password hash, google_su
 - `compounds`: id, peptide_type_id + slug/name, peptide_mg, bac_water_ml, compounded_at, notes, created_at
 - `uses`: id, compound_id, iu, syringe snapshots, volume_ml, peptide_mg, used_at, notes, created_at/updated_at
 
-Active compound = latest `compounded_at`. Remainder UI always means that row. After a compound has any uses, `peptide_mg` and `bac_water_ml` cannot change.
+Active compound = latest `compounded_at`. Remainder UI always means that row. Compounds stay editable after uses; changing `peptide_mg` or `bac_water_ml` recalculates stored use milligrams. Delete is allowed only when the vial has no uses.
 
 ## API (`/api/v1`, JSON, cookie auth)
 
@@ -134,9 +134,11 @@ Success bodies stay `{ "statusCode": 201, "data": { ... } }`. `GET /me` data is 
 | GET/POST | `/compounds` | inventory (`compounded_at DESC`, includes remaining) / mix |
 | GET | `/compounds/current` | latest `compounded_at` + remainder at default syringe. **404** when no vial (SPA treats empty) |
 | GET | `/compounds/{id}` | one mix + remainder |
-| PATCH | `/compounds/{id}` | notes + `compounded_at` always; mg/BAC/type only before first use |
+| PATCH | `/compounds/{id}` | always; mix changes recalc use mg and 422 if uses would overdraw |
+| DELETE | `/compounds/{id}` | 204 if unused; 422 if the vial has uses |
 | GET/POST | `/uses` | list `used_at DESC, id DESC` / log against current (or `compound_id`) |
 | PATCH | `/uses/{id}` | iu, syringe, used_at, notes; recalc mg; re-check remainder (original use put back first) |
+| DELETE | `/uses/{id}` | 204; remainder on the vial increases |
 | GET | `/uses/{id}` | one use |
 
 `GET /uses?before=iso&limit=50`. Default limit 50, cap 100. `before` is exclusive on `used_at`. POST `/uses` snapshots syringe onto the row. Default syringe for a new use: last-used if that profile still exists, else the default syringe. Edits keep the original vial.
@@ -182,14 +184,14 @@ Phone layout is the product. Design floor 360px (SE). Max content width 430px, s
 
 Viewport (this milestone): `width=device-width, initial-scale=1, viewport-fit=cover`. Tab bar and sticky CTAs pad `env(safe-area-inset-*)`. Body/inputs 16px so iOS Safari does not zoom. Add to Home Screen: `frontend/static/manifest.webmanifest` plus Apple `apple-mobile-web-app-capable` / title / status-bar meta in `app.html`. Desktop uses the same shell.
 
-Authenticated chrome: thin top bar + fixed bottom tabs. Login (`/login`) has no tabs. Home gear → `/settings` (syringes, set password, logout). Session-gated routes (Home, Log, Vials, History, Settings) redirect to `/login` when `GET /me` is 401. “Continue with Google” is a full-page navigation to `GET /api/v1/auth/google/start` (not XHR) because of the 302.
+Authenticated chrome: thin top bar + fixed bottom tabs. Login (`/login`) has no tabs. Home gear → `/settings` (syringes, set password, logout). Session-gated routes (Home, Log, Inventory, History, Settings) redirect to `/login` when `GET /me` is 401. “Continue with Google” is a full-page navigation to `GET /api/v1/auth/google/start` (not XHR) because of the 302.
 
 | Tab | Route | Role |
 | --- | --- | --- |
 | Home | `/` | Remainder hero, last few uses |
-| Log | `/use/new` | Center tab — IU stepper, sticky Save |
-| Vials | `/inventory` | Mixes; Mix is `/inventory/new` full-screen |
-| History | `/history` | Uses newest first; tap to edit |
+| Log | `/use/new` | Center tab — IU field, sticky Save |
+| Inventory | `/inventory` | Mixes with remaining mg/mL; Add is `/inventory/new` |
+| History | `/history` | Uses newest first; tap to edit or delete |
 
 Login has no tabs. Settings is `/settings` from the Home gear. Copy voice: clinical and short.
 

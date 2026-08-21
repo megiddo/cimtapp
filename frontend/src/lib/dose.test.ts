@@ -22,7 +22,8 @@ import {
   syringeLabel,
   trimNumber,
   unusualConcentration,
-  volumeMl
+  volumeMl,
+  waterNeededPerBottle
 } from './dose';
 
 describe('dose formulas', () => {
@@ -113,6 +114,17 @@ describe('dose formulas', () => {
     expect(unusualConcentration(0.5)).toBe(false);
     expect(unusualConcentration(20)).toBe(false);
     expect(unusualConcentration(5)).toBe(false);
+  });
+
+  it('solves bacteriostatic water from pepcalc-style mix targets', () => {
+    expect(waterNeededPerBottle(10, 2.5, 25, 0.5, 50)).toBe(1);
+    expect(waterNeededPerBottle(10, 1.25, 25, 0.5, 50)).toBe(2);
+    expect(waterNeededPerBottle(5, 0.25, 10, 1, 100)).toBe(2);
+    expect(waterNeededPerBottle(0, 2.5, 25, 0.5, 50)).toBeNull();
+    expect(waterNeededPerBottle(10, 0, 25, 0.5, 50)).toBeNull();
+    expect(waterNeededPerBottle(10, 2.5, 0, 0.5, 50)).toBeNull();
+    expect(waterNeededPerBottle(10, 2.5, 25, 0, 50)).toBeNull();
+    expect(waterNeededPerBottle(10, 2.5, 25, 0.5, 0)).toBeNull();
   });
 
   it('builds auto syringe labels without trailing zeros', () => {

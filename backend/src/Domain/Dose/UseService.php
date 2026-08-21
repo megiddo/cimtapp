@@ -102,6 +102,7 @@ final class UseService
             (float) $syringe['capacity_iu'],
         );
         $this->assertNotOverdraw($pdo, $compound, $peptideMg, $iu, $syringe, null);
+        $this->syringes->consumeOne($pdo, (string) $syringe['id']);
 
         $id = $this->ids->uuid();
         $now = $this->timestamp();
@@ -173,6 +174,13 @@ final class UseService
         );
         $this->assertNotOverdraw($pdo, $compound, $peptideMg, $iu, $syringe, $id);
 
+        $previousSyringeId = $existing['syringe_id'] === null ? null : (string) $existing['syringe_id'];
+        $nextSyringeId = $syringe['id'] === null ? null : (string) $syringe['id'];
+        if ($nextSyringeId !== null && $nextSyringeId !== $previousSyringeId) {
+            $this->syringes->consumeOne($pdo, $nextSyringeId);
+            $this->syringes->restoreOne($pdo, $previousSyringeId);
+        }
+
         $stmt = $pdo->prepare(
             'UPDATE uses SET
                 iu = :iu,
@@ -202,6 +210,14 @@ final class UseService
         ]);
 
         return $this->get($pdo, $id);
+    }
+
+    public function delete(PDO $pdo, string $id): void
+    {
+        $existing = $this->get($pdo, $id);
+        $this->syringes->restoreOne($pdo, $existing['syringe_id'] === null ? null : (string) $existing['syringe_id']);
+        $stmt = $pdo->prepare('DELETE FROM uses WHERE id = :id');
+        $stmt->execute([':id' => $id]);
     }
 
     /**

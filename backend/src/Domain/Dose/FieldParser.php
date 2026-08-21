@@ -92,6 +92,25 @@ final class FieldParser
         return $value;
     }
 
+    public function requirePositiveInt(string $key): int
+    {
+        $value = $this->requireFloat($key);
+        if ($value <= 0.0 || abs($value - round($value)) > 1e-9) {
+            throw new ValidationException([$key => [DoseConfig::MUST_BE_WHOLE]]);
+        }
+
+        return (int) round($value);
+    }
+
+    public function optionalPositiveInt(string $key): ?int
+    {
+        if (!$this->has($key) || $this->data[$key] === null) {
+            return null;
+        }
+
+        return $this->requirePositiveInt($key);
+    }
+
     public function optionalBool(string $key): ?bool
     {
         if (!$this->has($key) || $this->data[$key] === null) {

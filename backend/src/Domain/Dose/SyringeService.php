@@ -21,7 +21,7 @@ final class SyringeService
     public function list(PDO $pdo): array
     {
         $stmt = $pdo->query(
-            'SELECT id, label, volume_ml, capacity_iu, is_default
+            'SELECT id, label, volume_ml, capacity_iu, is_default, quantity
              FROM syringe_profiles
              ORDER BY is_default DESC, label ASC, id ASC'
         );
@@ -49,7 +49,7 @@ final class SyringeService
     public function defaultSyringe(PDO $pdo): array
     {
         $stmt = $pdo->query(
-            'SELECT id, label, volume_ml, capacity_iu, is_default
+            'SELECT id, label, volume_ml, capacity_iu, is_default, quantity
              FROM syringe_profiles
              WHERE is_default = 1
              LIMIT 1'
@@ -100,11 +100,12 @@ final class SyringeService
         $capacityIu = $fields->requirePositiveFloat('capacity_iu');
         $label = $fields->optionalString('label') ?? DoseConfig::syringeLabel($volumeMl, $capacityIu);
         $isDefault = $fields->optionalBool('is_default') ?? false;
+        $quantity = $fields->optionalPositiveInt('quantity') ?? 0;
         $id = $this->ids->uuid();
 
         $stmt = $pdo->prepare(
-            'INSERT INTO syringe_profiles (id, label, volume_ml, capacity_iu, is_default)
-             VALUES (:id, :label, :volume_ml, :capacity_iu, :is_default)'
+            'INSERT INTO syringe_profiles (id, label, volume_ml, capacity_iu, is_default, quantity)
+             VALUES (:id, :label, :volume_ml, :capacity_iu, :is_default, :quantity)'
         );
         $stmt->execute([
             ':id' => $id,
@@ -112,6 +113,7 @@ final class SyringeService
             ':volume_ml' => $volumeMl,
             ':capacity_iu' => $capacityIu,
             ':is_default' => $isDefault ? 1 : 0,
+            ':quantity' => $quantity,
         ]);
 
         if ($isDefault) {
@@ -127,16 +129,34 @@ final class SyringeService
     public function patch(PDO $pdo, string $id, FieldParser $fields): array
     {
         $existing = $this->get($pdo, $id);
-        $label = $existing['label'];
+        $volumeMl = $fields->has('volume_ml')
+            ? $fields->requirePositiveFloat('volume_ml')
+            : (float) $existing['volume_ml'];
+        $capacityIu = $fields->has('capacity_iu')
+            ? $fields->requirePositiveFloat('capacity_iu')
+            : (float) $existing['capacity_iu'];
+        $oldAuto = DoseConfig::syringeLabel((float) $existing['volume_ml'], (float) $existing['capacity_iu']);
+        $label = (string) $existing['label'];
         if ($fields->has('label')) {
             $label = $fields->optionalString('label');
             if ($label === null) {
                 throw new ValidationException(['label' => [DoseConfig::MUST_BE_TEXT]]);
             }
+        } elseif ($label === $oldAuto) {
+            $label = DoseConfig::syringeLabel($volumeMl, $capacityIu);
         }
 
-        $stmt = $pdo->prepare('UPDATE syringe_profiles SET label = :label WHERE id = :id');
-        $stmt->execute([':label' => $label, ':id' => $id]);
+        $stmt = $pdo->prepare(
+            'UPDATE syringe_profiles
+             SET label = :label, volume_ml = :volume_ml, capacity_iu = :capacity_iu
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            ':id' => $id,
+            ':label' => $label,
+            ':volume_ml' => $volumeMl,
+            ':capacity_iu' => $capacityIu,
+        ]);
 
         $makeDefault = $fields->optionalBool('is_default');
         if ($makeDefault === true) {
@@ -146,6 +166,89 @@ final class SyringeService
         }
 
         return $this->get($pdo, $id);
+    }
+
+    public function delete(PDO $pdo, string $id): void
+    {
+        $this->get($pdo, $id);
+        $others = array_values(array_filter(
+            $this->list($pdo),
+            static fn (array $row): bool => (string) $row['id'] !== $id,
+        ));
+        if ($others === []) {
+            throw new ValidationException(['id' => [DoseConfig::SYRINGE_LAST]], DoseConfig::SYRINGE_LAST);
+        }
+
+        $stmt = $pdo->prepare('DELETE FROM syringe_profiles WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+
+        $hasDefault = false;
+        foreach ($others as $row) {
+            if ($row['is_default'] === true) {
+                $hasDefault = true;
+                break;
+            }
+        }
+        if (!$hasDefault) {
+            $this->setDefault($pdo, (string) $others[0]['id']);
+        }
+    }
+
+    public function restock(PDO $pdo, string $id, FieldParser $fields): array
+    {
+        $existing = $this->get($pdo, $id);
+        $count = $fields->requirePositiveInt('count');
+        $this->setQuantity($pdo, $id, (int) $existing['quantity'] + $count);
+
+        return $this->get($pdo, $id);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function burn(PDO $pdo, string $id, FieldParser $fields): array
+    {
+        $existing = $this->get($pdo, $id);
+        $count = $fields->requirePositiveInt('count');
+        $remaining = (int) $existing['quantity'];
+        if ($count > $remaining) {
+            $message = DoseConfig::syringeOverdraw($count, $remaining);
+            throw new ValidationException(['count' => [$message]], $message);
+        }
+        $this->setQuantity($pdo, $id, $remaining - $count);
+
+        return $this->get($pdo, $id);
+    }
+
+    public function consumeOne(PDO $pdo, string $id): void
+    {
+        $existing = $this->get($pdo, $id);
+        $remaining = (int) $existing['quantity'];
+        if ($remaining < 1) {
+            throw new ValidationException(
+                ['syringe_id' => [DoseConfig::SYRINGE_STOCK_EMPTY]],
+                DoseConfig::SYRINGE_STOCK_EMPTY,
+            );
+        }
+        $this->setQuantity($pdo, $id, $remaining - 1);
+    }
+
+    public function restoreOne(PDO $pdo, ?string $id): void
+    {
+        if ($id === null || $id === '') {
+            return;
+        }
+        if ($this->find($pdo, $id) === null) {
+            return;
+        }
+        $existing = $this->get($pdo, $id);
+        $this->setQuantity($pdo, $id, (int) $existing['quantity'] + 1);
+    }
+
+    private function setQuantity(PDO $pdo, string $id, int $quantity): void
+    {
+        $stmt = $pdo->prepare('UPDATE syringe_profiles SET quantity = :quantity WHERE id = :id');
+        $stmt->execute([':id' => $id, ':quantity' => $quantity]);
     }
 
     private function setDefault(PDO $pdo, string $id): void
@@ -161,7 +264,7 @@ final class SyringeService
     private function find(PDO $pdo, string $id): ?array
     {
         $stmt = $pdo->prepare(
-            'SELECT id, label, volume_ml, capacity_iu, is_default
+            'SELECT id, label, volume_ml, capacity_iu, is_default, quantity
              FROM syringe_profiles
              WHERE id = :id'
         );
@@ -183,6 +286,7 @@ final class SyringeService
             'volume_ml' => (float) $row['volume_ml'],
             'capacity_iu' => (float) $row['capacity_iu'],
             'is_default' => (int) $row['is_default'] === 1,
+            'quantity' => (int) $row['quantity'],
         ];
     }
 }

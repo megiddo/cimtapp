@@ -20,7 +20,7 @@ export function remainderTone(remainingMg: number, peptideMg: number): Remainder
 
 export function remainderToneMessage(tone: RemainderTone): string | null {
   if (tone === 'danger') {
-    return 'Vial empty — mix a new compound.';
+    return 'Empty — add to inventory.';
   }
   if (tone === 'warning') {
     return 'Low remainder.';

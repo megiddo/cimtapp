@@ -31,9 +31,9 @@ describe('chrome layout tokens', () => {
 
 describe('NAV_TABS', () => {
   it('lists four tabs with Log emphasized in the center', () => {
-    expect(NAV_TABS.map((tab) => tab.id)).toEqual(['home', 'log', 'vials', 'history']);
+    expect(NAV_TABS.map((tab) => tab.id)).toEqual(['home', 'log', 'inventory', 'history']);
     expect(NAV_TABS.map((tab) => tab.href)).toEqual(['/', '/use/new', '/inventory', '/history']);
-    expect(NAV_TABS.map((tab) => tab.label)).toEqual(['Home', 'Log', 'Vials', 'History']);
+    expect(NAV_TABS.map((tab) => tab.label)).toEqual(['Home', 'Log', 'Inventory', 'History']);
     expect(NAV_TABS.filter((tab) => tab.emphasized)).toEqual([
       { id: 'log', href: '/use/new', label: 'Log', emphasized: true }
     ]);
@@ -78,6 +78,7 @@ describe('isTabActive', () => {
     expect(isTabActive('/use/new', '/use/new')).toBe(true);
     expect(isTabActive('/inventory', '/inventory')).toBe(true);
     expect(isTabActive('/inventory/new', '/inventory')).toBe(true);
+    expect(isTabActive('/inventory/abc', '/inventory')).toBe(true);
     expect(isTabActive('/history/edit', '/history')).toBe(true);
     expect(isTabActive('/inventory', '/history')).toBe(false);
     expect(isTabActive('/use', '/use/new')).toBe(false);
@@ -89,8 +90,14 @@ describe('titleForPath', () => {
     expect(titleForPath('/')).toBe('Home');
     expect(titleForPath('/use/new')).toBe('Log');
     expect(titleForPath('/use/123')).toBe('Log');
-    expect(titleForPath('/inventory')).toBe('Vials');
-    expect(titleForPath('/inventory/new')).toBe('Mix');
+    expect(titleForPath('/inventory')).toBe('Inventory');
+    expect(titleForPath('/inventory/new')).toBe('Add');
+    expect(titleForPath('/inventory/water/new')).toBe('Add BAC');
+    expect(titleForPath('/inventory/water/abc')).toBe('Edit');
+    expect(titleForPath('/inventory/syringes/new')).toBe('Add syringe');
+    expect(titleForPath('/inventory/syringes/abc')).toBe('Edit');
+    expect(titleForPath('/inventory/peptides/new')).toBe('Add peptide');
+    expect(titleForPath('/inventory/abc')).toBe('Edit');
     expect(titleForPath('/history')).toBe('History');
     expect(titleForPath('/history/1')).toBe('Edit');
     expect(titleForPath('/login')).toBe('Sign in');
@@ -102,8 +109,14 @@ describe('titleForPath', () => {
 });
 
 describe('backHrefForPath', () => {
-  it('returns a chevron target for mix and edit only', () => {
+  it('returns a chevron target for mix, vial edit, and use edit', () => {
     expect(backHrefForPath('/inventory/new')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/water/new')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/water/abc')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/syringes/new')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/syringes/abc')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/peptides/new')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/abc')).toBe('/inventory');
     expect(backHrefForPath('/history/abc')).toBe('/history');
     expect(backHrefForPath('/history')).toBeNull();
     expect(backHrefForPath('/inventory')).toBeNull();
@@ -112,10 +125,16 @@ describe('backHrefForPath', () => {
 });
 
 describe('needsStickyCta', () => {
-  it('is true on log, mix, inventory, and edit', () => {
+  it('is true on log, mix, inventory, vial edit, and use edit', () => {
     expect(needsStickyCta('/use/new')).toBe(true);
     expect(needsStickyCta('/inventory')).toBe(true);
     expect(needsStickyCta('/inventory/new')).toBe(true);
+    expect(needsStickyCta('/inventory/water/new')).toBe(true);
+    expect(needsStickyCta('/inventory/water/abc')).toBe(true);
+    expect(needsStickyCta('/inventory/syringes/new')).toBe(true);
+    expect(needsStickyCta('/inventory/syringes/abc')).toBe(true);
+    expect(needsStickyCta('/inventory/peptides/new')).toBe(true);
+    expect(needsStickyCta('/inventory/abc')).toBe(true);
     expect(needsStickyCta('/history/abc')).toBe(true);
     expect(needsStickyCta('/history')).toBe(false);
     expect(needsStickyCta('/')).toBe(false);

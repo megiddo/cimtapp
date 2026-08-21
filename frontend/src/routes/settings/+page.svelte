@@ -108,7 +108,7 @@
         <div class="row">
           <span>
             <span class="primary">{syringe.label}</span>
-            <div class="secondary">{syringe.volume_ml} mL · {syringe.capacity_iu} IU</div>
+            <div class="secondary">{syringe.volume_ml} mL · {syringe.capacity_iu} IU · {syringe.quantity} on hand</div>
           </span>
           {#if syringe.is_default}
             <span class="default-mark">Default</span>

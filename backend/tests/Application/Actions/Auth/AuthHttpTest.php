@@ -525,6 +525,7 @@ class AuthHttpTest extends TestCase
                 $this->assertEqualsWithDelta(0.5, (float) $syringe['volume_ml'], 0.0001);
                 $this->assertEqualsWithDelta(50.0, (float) $syringe['capacity_iu'], 0.0001);
                 $this->assertSame(1, (int) $syringe['is_default']);
+                $this->assertSame(0, (int) $syringe['quantity']);
             }
         );
     }

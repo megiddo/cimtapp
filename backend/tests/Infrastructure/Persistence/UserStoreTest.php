@@ -48,13 +48,51 @@ class UserStoreTest extends TestCase
         $this->assertSame([], glob($this->dir . '/tmp/*.sqlite') ?: []);
 
         $this->store->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
-            foreach (['account', 'syringe_profiles', 'compounds', 'uses'] as $table) {
+            foreach (['account', 'syringe_profiles', 'compounds', 'uses', 'bac_bottles', 'user_peptide_types'] as $table) {
                 $stmt = $pdo->prepare(
                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name"
                 );
                 $stmt->execute([':name' => $table]);
                 $this->assertNotFalse($stmt->fetchColumn(), $table . ' missing');
             }
+        });
+    }
+
+    public function testUnlockAppliesPendingUserMigrations(): void
+    {
+        $only001 = $this->makeTempDir('cimtapp-mig-');
+        $this->assertTrue(copy(
+            dirname(__DIR__, 3) . '/migrations/user/001_create_schema.sql',
+            $only001 . '/001_create_schema.sql',
+        ));
+        $legacy = new UserStore($this->crypto, new UserMigrator($only001), new DataPaths($this->dir));
+        $legacy->create(self::USER_ID, $this->dek);
+        $legacy->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
+            $names = array_map(
+                static fn (array $col): string => (string) $col['name'],
+                $pdo->query('PRAGMA table_info(syringe_profiles)')->fetchAll(PDO::FETCH_ASSOC) ?: [],
+            );
+            $this->assertNotContains('quantity', $names);
+            $missing = $pdo->query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'bac_bottles'"
+            );
+            $this->assertFalse($missing === false ? false : $missing->fetchColumn());
+        });
+
+        $this->store->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
+            $names = array_map(
+                static fn (array $col): string => (string) $col['name'],
+                $pdo->query('PRAGMA table_info(syringe_profiles)')->fetchAll(PDO::FETCH_ASSOC) ?: [],
+            );
+            $this->assertContains('quantity', $names);
+            $found = $pdo->query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'bac_bottles'"
+            );
+            $this->assertNotFalse($found === false ? false : $found->fetchColumn());
+            $peptides = $pdo->query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'user_peptide_types'"
+            );
+            $this->assertNotFalse($peptides === false ? false : $peptides->fetchColumn());
         });
     }
 

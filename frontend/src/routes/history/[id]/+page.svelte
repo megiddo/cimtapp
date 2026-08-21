@@ -7,13 +7,12 @@
     formatDoseLine,
     formatMg,
     parseIuInput,
-    peptideMgAtConcentration,
-    stepIu
+    peptideMgAtConcentration
   } from '$lib/dose';
   import { toDatetimeLocalValue } from '$lib/datetime';
   import { OFFLINE_SAVE_MESSAGE, saveWhileOnline } from '$lib/offline';
   import { firstFieldError, type FieldMap } from '$lib/payload';
-  import { fetchSyringes, fetchUse, patchUse, type LoggedUse, type Syringe } from '$lib/inventory';
+  import { deleteUse, fetchSyringes, fetchUse, patchUse, type LoggedUse, type Syringe } from '$lib/inventory';
 
   let original = $state<LoggedUse | null>(null);
   let syringes = $state<Syringe[]>([]);
@@ -22,10 +21,12 @@
   let usedAt = $state('');
   let notes = $state('');
   let pending = $state(false);
+  let deleting = $state(false);
   let fields = $state<FieldMap>({});
   let loaded = $state(false);
   let toast = $state('');
   let iuError = $state('');
+  let formError = $state('');
 
   const iu = $derived(parseIuInput(iuText));
   const syringe = $derived(syringes.find((item) => item.id === syringeId) ?? null);
@@ -60,16 +61,18 @@
 
   async function onSubmit(event: SubmitEvent) {
     event.preventDefault();
-    if (original === null || iu === null) {
+    const target = original;
+    if (target === null || iu === null) {
       return;
     }
     pending = true;
     fields = {};
     toast = '';
     iuError = '';
+    formError = '';
     try {
       const result = await saveWhileOnline(() =>
-        patchUse(original.id, {
+        patchUse(target.id, {
           iu,
           syringe_id: syringeId || undefined,
           used_at: usedAt,
@@ -88,6 +91,32 @@
       toast = OFFLINE_SAVE_MESSAGE;
     }
   }
+
+  async function onDelete() {
+    const target = original;
+    if (target === null) {
+      return;
+    }
+    const ok = window.confirm('Delete this use? Remainder on the mix will increase.');
+    if (!ok) {
+      return;
+    }
+    deleting = true;
+    formError = '';
+    toast = '';
+    try {
+      const result = await saveWhileOnline(() => deleteUse(target.id));
+      deleting = false;
+      if (result.ok) {
+        await goto('/history');
+        return;
+      }
+      formError = result.message;
+    } catch {
+      deleting = false;
+      toast = OFFLINE_SAVE_MESSAGE;
+    }
+  }
 </script>
 
 {#if toast}
@@ -102,11 +131,7 @@
   <form class="auth-form" onsubmit={onSubmit}>
     <label>
       IU
-      <div class="stepper">
-        <button type="button" aria-label="Decrease IU" disabled={pending} onclick={() => (iuText = String(stepIu(iu ?? 1, -1)))}>−</button>
-        <input inputmode="decimal" name="iu" bind:value={iuText} disabled={pending} />
-        <button type="button" aria-label="Increase IU" disabled={pending} onclick={() => (iuText = String(stepIu(iu ?? 0, 1)))}>+</button>
-      </div>
+      <input inputmode="decimal" name="iu" bind:value={iuText} disabled={pending || deleting} />
       {#if iuError}
         <span class="field-error">{iuError}</span>
       {/if}
@@ -139,8 +164,16 @@
       </label>
     </div>
 
+    {#if formError}
+      <p class="field-error" role="alert">{formError}</p>
+    {/if}
+
     <div class="sticky-cta">
-      <button type="submit" disabled={pending || !loaded || iu === null}>{pending ? 'Saving…' : 'Save'}</button>
+      <button type="submit" disabled={pending || deleting || !loaded || iu === null}>{pending ? 'Saving…' : 'Save'}</button>
     </div>
   </form>
+
+  <button class="danger" type="button" disabled={pending || deleting} onclick={onDelete}>
+    {deleting ? 'Deleting…' : 'Delete use'}
+  </button>
 {/if}

@@ -36,21 +36,35 @@ final class DoseConfig
 
     public const PEPTIDE_UNKNOWN = 'Choose a peptide from the catalog.';
 
+    public const PEPTIDE_NAME_TAKEN = 'That peptide is already on the list.';
+
+    public const PEPTIDE_NAME_TOO_LONG = 'Use a name of 80 characters or fewer.';
+
     public const NO_COMPOUND = 'Mix a vial before logging a use.';
 
     public const COMPOUND_UNKNOWN = 'Compound not found.';
 
     public const SYRINGE_UNKNOWN = 'Syringe not found.';
 
+    public const SYRINGE_STOCK_EMPTY = 'No syringes remaining of this type.';
+
+    public const BAC_UNKNOWN = 'Bacteriostatic water bottle not found.';
+
+    public const NO_BAC_BOTTLE = 'Add a bacteriostatic water bottle before mixing a vial.';
+
+    public const BAC_IN_USE = 'This bottle has been used and cannot be deleted.';
+
+    public const MUST_BE_WHOLE = 'Enter a whole number greater than 0.';
+
     public const USE_UNKNOWN = 'Use not found.';
 
     public const DEFAULT_REQUIRED = 'Keep one default syringe.';
 
-    public const PEPTIDE_LOCKED = 'Peptide type cannot change after the first use.';
+    public const SYRINGE_LAST = 'Keep at least one syringe type.';
 
-    public const MG_LOCKED = 'Peptide milligrams cannot change after the first use.';
+    public const COMPOUND_HAS_USES = 'This vial has logged uses and cannot be deleted.';
 
-    public const BAC_LOCKED = 'BAC water cannot change after the first use.';
+    public const COMPOUND_OVERDRAW = 'Existing uses would exceed this mix. Reduce those uses or increase peptide milligrams.';
 
     public const LIMIT_INVALID = 'Limit must be between 1 and 100.';
 
@@ -59,6 +73,16 @@ final class DoseConfig
     public static function overdraw(string $requestedIu, string $remainingIu): string
     {
         return $requestedIu . ' IU exceeds ' . $remainingIu . ' IU remaining in this vial.';
+    }
+
+    public static function bacOverdraw(string $requestedMl, string $remainingMl): string
+    {
+        return $requestedMl . ' mL exceeds ' . $remainingMl . ' mL remaining in bacteriostatic water.';
+    }
+
+    public static function syringeOverdraw(int $requested, int $remaining): string
+    {
+        return $requested . ' exceeds ' . $remaining . ' syringes remaining.';
     }
 
     public static function formatIu(float $iu): string
