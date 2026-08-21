@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+         failOnRisky="true"
+         failOnWarning="true"
+         beStrictAboutOutputDuringTests="false"
+>
+    <testsuites>
+        <testsuite name="Application">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory suffix=".php">src</directory>
+        </include>
+        <exclude>
+            <file>src/Application/Settings/SettingsInterface.php</file>
+        </exclude>
+    </source>
+    <coverage>
+        <report>
+            <clover outputFile="coverage/clover.xml"/>
+            <html outputDirectory="coverage/html"/>
+            <text outputFile="coverage/coverage.txt"/>
+        </report>
+    </coverage>
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="CIMT_MASTER_KEY" value="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" force="true"/>
+        <env name="DATA_DIR" value="/tmp/cimtapp-test-data" force="true"/>
+        <env name="APP_URL" value="http://localhost:8080" force="true"/>
+        <env name="SESSION_SECURE" value="false" force="true"/>
+        <ini name="display_errors" value="1"/>
+    </php>
+</phpunit>
