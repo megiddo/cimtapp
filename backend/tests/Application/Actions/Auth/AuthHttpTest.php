@@ -234,7 +234,7 @@ class AuthHttpTest extends TestCase
             'code=ok&state=' . $state,
         ));
         $this->assertSame(302, $callback->getStatusCode());
-        $this->assertSame('http://localhost:8080/', $callback->getHeaderLine('Location'));
+        $this->assertSame('http://localhost:24780/', $callback->getHeaderLine('Location'));
         $sid = $this->sessionIdFrom($callback);
 
         $set = $app->handle($this->createJsonRequest(
@@ -273,7 +273,7 @@ class AuthHttpTest extends TestCase
             'code=ok&state=' . $this->google->lastState,
         ));
         $this->assertSame(302, $callback->getStatusCode());
-        $this->assertSame('http://localhost:8080/', $callback->getHeaderLine('Location'));
+        $this->assertSame('http://localhost:24780/', $callback->getHeaderLine('Location'));
 
         $count = (int) $this->globalPdo($app)->query('SELECT COUNT(*) FROM users')->fetchColumn();
         $this->assertSame(1, $count);

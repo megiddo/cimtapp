@@ -49,7 +49,7 @@ final class EnvValidator
             throw new InvalidArgumentException('DATA_DIR must be a non-empty absolute or relative path.');
         }
 
-        $appUrl = $this->read($env, 'APP_URL', 'http://localhost:8080');
+        $appUrl = $this->read($env, 'APP_URL', 'http://localhost:24780');
         if (!$this->isValidAppUrl($appUrl)) {
             throw new InvalidArgumentException('APP_URL must be an absolute http(s) URL.');
         }

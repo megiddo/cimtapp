@@ -5,11 +5,11 @@ describe('apiUrl', () => {
   it('avoids a double slash and prefixes a relative path', () => {
     expect(apiUrl('/api/v1/health')).toBe('/api/v1/health');
     expect(apiUrl('api/v1/health')).toBe('/api/v1/health');
-    expect(apiUrl('/api/v1/health', 'http://localhost:8080')).toBe(
-      'http://localhost:8080/api/v1/health'
+    expect(apiUrl('/api/v1/health', 'http://localhost:24780')).toBe(
+      'http://localhost:24780/api/v1/health'
     );
-    expect(apiUrl('/api/v1/health', 'http://localhost:8080/')).toBe(
-      'http://localhost:8080/api/v1/health'
+    expect(apiUrl('/api/v1/health', 'http://localhost:24780/')).toBe(
+      'http://localhost:24780/api/v1/health'
     );
   });
 });
@@ -24,12 +24,12 @@ describe('apiFetch', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await apiFetch('/api/v1/health', {
-      baseUrl: 'http://localhost:8080',
+      baseUrl: 'http://localhost:24780',
       method: 'GET',
       credentials: 'omit'
     });
 
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost:8080/api/v1/health', {
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:24780/api/v1/health', {
       method: 'GET',
       credentials: 'include'
     });

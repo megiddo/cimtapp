@@ -52,12 +52,12 @@ describe('session gating', () => {
       status: 200,
       json: async () => ({ statusCode: 200, data: me })
     });
-    await expect(probeSession(fetchMock, 'http://localhost:8080')).resolves.toEqual({
+    await expect(probeSession(fetchMock, 'http://localhost:24780')).resolves.toEqual({
       authenticated: true,
       me,
       status: 200
     });
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost:8080/api/v1/me', {
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:24780/api/v1/me', {
       credentials: 'include'
     });
   });

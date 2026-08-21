@@ -30,7 +30,7 @@ class EnvValidatorTest extends TestCase
             'APP_ENV' => 'testing',
             'CIMT_MASTER_KEY' => self::HEX_KEY,
             'DATA_DIR' => '/tmp/cimtapp-data',
-            'APP_URL' => 'http://localhost:8080',
+            'APP_URL' => 'http://localhost:24780',
             'SESSION_SECURE' => 'false',
         ], $overrides);
     }
@@ -42,7 +42,7 @@ class EnvValidatorTest extends TestCase
         $this->assertSame('testing', $result['appEnv']);
         $this->assertSame(self::HEX_KEY, $result['masterKey']);
         $this->assertSame('/tmp/cimtapp-data', $result['dataDir']);
-        $this->assertSame('http://localhost:8080', $result['appUrl']);
+        $this->assertSame('http://localhost:24780', $result['appUrl']);
         $this->assertFalse($result['sessionSecure']);
         $this->assertSame('', $result['googleClientId']);
         $this->assertSame('', $result['googleClientSecret']);
@@ -203,7 +203,7 @@ class EnvValidatorTest extends TestCase
 
         $this->assertSame('development', $result['appEnv']);
         $this->assertNotSame('', $result['dataDir']);
-        $this->assertSame('http://localhost:8080', $result['appUrl']);
+        $this->assertSame('http://localhost:24780', $result['appUrl']);
         $this->assertFalse($result['sessionSecure']);
     }
 
@@ -235,7 +235,7 @@ class EnvValidatorTest extends TestCase
         $result = $this->validator->validate($this->baseEnv([
             'APP_URL' => ['http://bad.example'],
         ]));
-        $this->assertSame('http://localhost:8080', $result['appUrl']);
+        $this->assertSame('http://localhost:24780', $result['appUrl']);
     }
 
     public function testProductionRejectsMissingGoogleSecret(): void

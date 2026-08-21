@@ -35,8 +35,8 @@ describe('health client', () => {
 
   it('builds the health URL without a double slash', () => {
     expect(healthUrl('')).toBe('/api/v1/health');
-    expect(healthUrl('http://localhost:8080')).toBe('http://localhost:8080/api/v1/health');
-    expect(healthUrl('http://localhost:8080/')).toBe('http://localhost:8080/api/v1/health');
+    expect(healthUrl('http://localhost:24780')).toBe('http://localhost:24780/api/v1/health');
+    expect(healthUrl('http://localhost:24780/')).toBe('http://localhost:24780/api/v1/health');
   });
 
   it('fetches health with credentials and returns the payload', async () => {
@@ -46,8 +46,8 @@ describe('health client', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(fetchHealth('http://localhost:8080')).resolves.toEqual({ status: 'ok' });
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost:8080/api/v1/health', {
+    await expect(fetchHealth('http://localhost:24780')).resolves.toEqual({ status: 'ok' });
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:24780/api/v1/health', {
       credentials: 'include'
     });
   });
