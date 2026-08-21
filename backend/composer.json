@@ -41,7 +41,7 @@
         }
     },
     "scripts": {
-        "start": "php -S localhost:8080 -t public public/router.php",
+        "start": "php -S localhost:24780 -t public public/router.php",
         "test": [
             "@php vendor/bin/phpunit --coverage-clover coverage/clover.xml --coverage-text",
             "@php scripts/check-coverage.php"

@@ -20,7 +20,7 @@ class HttpGoogleOAuthClientTest extends TestCase
         $client = new HttpGoogleOAuthClient(
             'client-id',
             'client-secret',
-            'http://localhost:8080/api/v1/auth/google/callback',
+            'http://localhost:24780/api/v1/auth/google/callback',
             new RecordingTransport(),
         );
         $this->assertTrue($client->isConfigured());
@@ -190,7 +190,7 @@ class HttpGoogleOAuthClientTest extends TestCase
         return new HttpGoogleOAuthClient(
             'id',
             'secret',
-            'http://localhost:8080/callback',
+            'http://localhost:24780/callback',
             $http,
         );
     }

@@ -180,7 +180,7 @@ class AuthServiceEdgeTest extends TestCase
             'code=ok&state=' . $this->google->lastState,
         ));
         $this->assertSame(302, $again->getStatusCode());
-        $this->assertSame('http://localhost:8080/', $again->getHeaderLine('Location'));
+        $this->assertSame('http://localhost:24780/', $again->getHeaderLine('Location'));
         $this->assertSame(1, (int) $this->globalPdo($app)->query('SELECT COUNT(*) FROM users')->fetchColumn());
     }
 }

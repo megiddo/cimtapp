@@ -18,8 +18,8 @@ describe('auth helpers', () => {
   it('normalizes email and keeps the Google start path as a full-page URL', () => {
     expect(normalizeEmail('  Foo@Example.COM  ')).toBe('foo@example.com');
     expect(googleStartUrl()).toBe('/api/v1/auth/google/start');
-    expect(googleStartUrl('http://localhost:8080/')).toBe(
-      'http://localhost:8080/api/v1/auth/google/start'
+    expect(googleStartUrl('http://localhost:24780/')).toBe(
+      'http://localhost:24780/api/v1/auth/google/start'
     );
     expect(PASSWORD_MIN_LENGTH).toBe(12);
   });

@@ -12,24 +12,24 @@ make frontend-build           # writes the SPA into backend/public/
 docker compose up --build     # development compose (bind-mounts PHP)
 ```
 
-App URL: **http://localhost:8080**
+App URL: **http://localhost:24780** (dev). Production compose publishes **http://localhost:25880**.
 
-If **8080 is already taken**, remap the host port and point `APP_URL` at it. Compose **appends** `ports` unless you override:
+If the host port is already taken, remap it and point `APP_URL` at it. Compose **appends** `ports` unless you override:
 
 ```yaml
 # docker-compose.override.yml (local only)
 services:
   app:
     ports: !override
-      - "18080:80"
+      - "26980:80"
     environment:
-      APP_URL: http://localhost:18080
-      GOOGLE_REDIRECT_URI: http://localhost:18080/api/v1/auth/google/callback
+      APP_URL: http://localhost:26980
+      GOOGLE_REDIRECT_URI: http://localhost:26980/api/v1/auth/google/callback
 ```
 
-Then open **http://localhost:18080** instead.
+Then open **http://localhost:26980** instead.
 
-Health: **http://localhost:8080/api/v1/health** (or the remapped host port) → `{ "status": "ok" }`
+Health: **http://localhost:24780/api/v1/health** (or the remapped host port) → `{ "status": "ok" }`
 
 Auth (same origin, cookie `cimtapp_session`): `POST /api/v1/auth/register`, `/auth/login`, `/auth/logout`; `GET /api/v1/auth/google/start` (full page); `GET /api/v1/me`. Login and Google start are limited to **10 attempts / 15 minutes** per IP (and per email for login). Domain (cookie required): `GET /peptide-types`, `/syringes`, `/compounds`, `/compounds/current` (**404** if none), `/uses`; `POST /compounds` (mix), `POST /uses` (log). `GET /api/v1/me/export` downloads the logged-in user’s plaintext sqlite. Passwords are Argon2id, minimum 12 characters. Google is mocked in tests — no real `GOOGLE_CLIENT_*` required outside production.
 
@@ -39,6 +39,7 @@ Auth (same origin, cookie `cimtapp_session`): `POST /api/v1/auth/register`, `/au
 
 ```bash
 # .env needs a real CIMT_MASTER_KEY and Google OAuth (required when APP_ENV=production)
+# Set APP_URL and GOOGLE_REDIRECT_URI to http://localhost:25880 (or your public origin)
 make up-prod
 # or
 docker compose -f docker-compose.prod.yml up --build
@@ -71,7 +72,7 @@ docker compose run --rm frontend npm run build
 Without Docker (PHP 8.3+ and Node 22/20):
 
 ```bash
-cd backend && composer install && composer start   # http://localhost:8080
+cd backend && composer install && composer start   # http://localhost:24780
 cd frontend && npm ci && npm run build             # SPA into backend/public/
 ```
 
@@ -95,7 +96,7 @@ See [docs/TESTING.md](docs/TESTING.md) for floors and why they exist.
 | `CIMT_MASTER_KEY` | 256-bit AMK: **64 hex chars** or **base64 of 32 bytes**. `openssl rand -hex 32` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client id (required only in production) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth secret (required only in production; never in the SPA) |
-| `GOOGLE_REDIRECT_URI` | e.g. `http://localhost:8080/api/v1/auth/google/callback` |
+| `GOOGLE_REDIRECT_URI` | e.g. `http://localhost:24780/api/v1/auth/google/callback` |
 | `DATA_DIR` | Directory for `global.sqlite`, `users/*.enc`, and `tmp/` plaintext-while-unlocked (Docker: `/var/www/cimtapp/data`, host `./data`) |
 | `APP_URL` | Public origin, no trailing slash required |
 | `SESSION_SECURE` | `true`/`false` — Secure cookie flag (Phase 1) |
