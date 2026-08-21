@@ -64,7 +64,9 @@ docker compose run --rm frontend npm run mutation
 ## Make targets
 
 ```bash
-make test          # PHPUnit + Vitest (via compose)
+make test          # PHPUnit + Vitest (via development compose)
 make infection     # Infection in the PHP container
 make mutation      # Infection + Stryker
+make up            # docker compose up --build (dev)
+make up-prod       # docker compose -f docker-compose.prod.yml up --build
 ```
