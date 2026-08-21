@@ -12,7 +12,7 @@ Condensed from the design canvas so later agents do not need it. Product: a pers
 | Global store | `data/global.sqlite` | Users, sessions, wrapped DEKs, peptide catalog. Migrated on Slim boot. |
 | User store | `data/users/{uuid}.sqlite.enc` | Compounds, uses, syringe profiles, identity snapshot. Locked per request. |
 | Crypto | libsodium secretbox + secretstream | `App\Domain\Crypto\Crypto`. Stock PHP (`ext-sodium`). No SQLCipher. |
-| Plaintext tmp | `DATA_DIR/tmp` | Decrypted user sqlite while a request holds the flock. Docker mounts tmpfs at `/var/www/cimtapp/data/tmp`. |
+| Plaintext tmp | `DATA_DIR/tmp` | Decrypted user sqlite while a request holds the flock. Docker mounts tmpfs at `/var/www/cimtapp/data/tmp`. Host `./data` is bind-mounted in both `docker-compose.yml` (dev) and `docker-compose.prod.yml` (prod) so ciphertext survives rebuilds. |
 | OAuth | Google authorization code | Server exchanges the code. Never put the client secret in the SPA. |
 
 PHP front controller matches the Slim skeleton: PHP-DI `ContainerBuilder`, `app/settings.php` + `dependencies.php` + `repositories.php`, `AppFactory::setContainer`, middleware + routes, `ServerRequestCreatorFactory`, `HttpErrorHandler`, `ShutdownHandler`, routing/body/error middleware, `ResponseEmitter`.

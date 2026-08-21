@@ -10,7 +10,7 @@ Copy these together. All three are required:
 2. `data/users/*.enc` — encrypted per-user stores (compounds, uses, syringes)
 3. **`CIMT_MASTER_KEY`** — the AMK that unwraps every `users.encrypted_dek`
 
-Do not copy `data/tmp/` (plaintext while a request is in flight). Docker mounts that directory as tmpfs.
+Do not copy `data/tmp/` (plaintext while a request is in flight). Docker mounts that directory as tmpfs. Dev and prod Compose both bind the host `./data` directory, so backups are a copy of that folder plus the AMK.
 
 ## Restore
 

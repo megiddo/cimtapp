@@ -9,7 +9,7 @@ This repository currently ships **v1 (Phase 3)**: mix a vial, log IU, remainder,
 ```bash
 cp .env.example .env          # dummy CIMT_MASTER_KEY is fine locally
 make frontend-build           # writes the SPA into backend/public/
-docker compose up --build
+docker compose up --build     # development compose (bind-mounts PHP)
 ```
 
 App URL: **http://localhost:8080**
@@ -33,7 +33,18 @@ Health: **http://localhost:8080/api/v1/health** (or the remapped host port) → 
 
 Auth (same origin, cookie `cimtapp_session`): `POST /api/v1/auth/register`, `/auth/login`, `/auth/logout`; `GET /api/v1/auth/google/start` (full page); `GET /api/v1/me`. Login and Google start are limited to **10 attempts / 15 minutes** per IP (and per email for login). Domain (cookie required): `GET /peptide-types`, `/syringes`, `/compounds`, `/compounds/current` (**404** if none), `/uses`; `POST /compounds` (mix), `POST /uses` (log). `GET /api/v1/me/export` downloads the logged-in user’s plaintext sqlite. Passwords are Argon2id, minimum 12 characters. Google is mocked in tests — no real `GOOGLE_CLIENT_*` required outside production.
 
-`make up` is equivalent to copying `.env` if missing and running `docker compose up --build`. Bind-mounts `backend/` for PHP edits. SQLite files persist in the `cimtapp-data` volume at `/var/www/cimtapp/data`. Decrypted user sqlite is written only under `DATA_DIR/tmp` (`/var/www/cimtapp/data/tmp` in Docker, tmpfs-mounted).
+`make up` is equivalent to copying `.env` if missing and running `docker compose up --build` (**development**: bind-mounts `backend/` for PHP edits). `make up-prod` uses `docker-compose.prod.yml` (image contents only, `APP_ENV=production`, `SESSION_SECURE=true`, real `CIMT_MASTER_KEY` required in `.env`). Both bind `./data` on the host to `/var/www/cimtapp/data`, so `global.sqlite` and `users/*.enc` survive container rebuilds. Decrypted user sqlite is written only under `DATA_DIR/tmp` (tmpfs in Docker — not on the host). If you still have the old named volume `cimtapp_cimtapp-data`, copy it once: `docker run --rm -v cimtapp_cimtapp-data:/from -v "$PWD/data:/to" alpine sh -c 'cp -a /from/. /to/'`.
+
+### Production
+
+```bash
+# .env needs a real CIMT_MASTER_KEY and Google OAuth (required when APP_ENV=production)
+make up-prod
+# or
+docker compose -f docker-compose.prod.yml up --build
+```
+
+No PHP bind-mount. The SPA is baked into the image on `--build`. SQLite is still `./data` on the host.
 
 ### First run
 
@@ -55,7 +66,7 @@ make frontend-build
 docker compose run --rm frontend npm run build
 ```
 
-`docker compose up --build` does not rebuild the SPA.
+`docker compose up --build` (dev) does not rebuild the SPA. Production bakes the SPA into the image, so `make up-prod` / `docker compose -f docker-compose.prod.yml up --build` picks up frontend changes.
 
 Without Docker (PHP 8.3+ and Node 22/20):
 
@@ -85,7 +96,7 @@ See [docs/TESTING.md](docs/TESTING.md) for floors and why they exist.
 | `GOOGLE_CLIENT_ID` | Google OAuth client id (required only in production) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth secret (required only in production; never in the SPA) |
 | `GOOGLE_REDIRECT_URI` | e.g. `http://localhost:8080/api/v1/auth/google/callback` |
-| `DATA_DIR` | Directory for `global.sqlite`, `users/*.enc`, and `tmp/` plaintext-while-unlocked (Docker: `/var/www/cimtapp/data`) |
+| `DATA_DIR` | Directory for `global.sqlite`, `users/*.enc`, and `tmp/` plaintext-while-unlocked (Docker: `/var/www/cimtapp/data`, host `./data`) |
 | `APP_URL` | Public origin, no trailing slash required |
 | `SESSION_SECURE` | `true`/`false` — Secure cookie flag (Phase 1) |
 | `docker` | Set in the image so Monolog logs to stdout |
@@ -95,11 +106,13 @@ Examples live at `.env.example` and `backend/.env.example`. Real `.env` files ar
 ## Layout
 
 ```
-backend/          Slim 4 (slim-skeleton): public/index.php, app/, src/, tests/
-backend/migrations/  global + per-user sqlite SQL, applied on boot / account create
-frontend/         SvelteKit + adapter-static (SPA, no Svelte server)
-docs/             DESIGN, work checklist, testing gates, backup / AMK rotation
-data/             gitignored sqlite / encrypted user stores (`tmp/` plaintext while unlocked)
+backend/                 Slim 4 (slim-skeleton): public/index.php, app/, src/, tests/
+backend/migrations/       global + per-user sqlite SQL, applied on boot / account create
+frontend/                SvelteKit + adapter-static (SPA, no Svelte server)
+docs/                    DESIGN, work checklist, testing gates, backup / AMK rotation
+docker-compose.yml       development (PHP bind-mount, dummy AMK fallback)
+docker-compose.prod.yml  production (image only, Secure cookies, required AMK)
+data/                    host sqlite + encrypted user stores (bind-mounted in both compose files)
 ```
 
 Architecture summary: [docs/DESIGN.md](docs/DESIGN.md). Phased work: [docs/WORK-CHECKLIST.md](docs/WORK-CHECKLIST.md). Backup: [docs/BACKUP.md](docs/BACKUP.md).
