@@ -1,6 +1,6 @@
 {
-  "name": "PepCalc",
-  "short_name": "PepCalc",
+  "name": "PepTrack",
+  "short_name": "PepTrack",
   "description": "Personal compounding log for incretin mimetics.",
   "start_url": "/",
   "display": "standalone",

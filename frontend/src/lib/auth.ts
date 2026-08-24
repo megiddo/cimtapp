@@ -125,7 +125,7 @@ export async function setPassword(password: string, baseUrl = ''): Promise<AuthR
 }
 
 export const USER_EXPORT_PATH = '/api/v1/me/export';
-export const USER_EXPORT_FILENAME = 'pepcalc-export.sqlite';
+export const USER_EXPORT_FILENAME = 'peptrack-export.sqlite';
 
 export function triggerBlobDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);

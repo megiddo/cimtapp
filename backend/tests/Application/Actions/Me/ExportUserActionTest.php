@@ -28,7 +28,7 @@ class ExportUserActionTest extends TestCase
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('application/octet-stream', $response->getHeaderLine('Content-Type'));
-        $this->assertStringContainsString('pepcalc-export.sqlite', $response->getHeaderLine('Content-Disposition'));
+        $this->assertStringContainsString('peptrack-export.sqlite', $response->getHeaderLine('Content-Disposition'));
         $this->assertSame('no-store', $response->getHeaderLine('Cache-Control'));
 
         $bytes = (string) $response->getBody();

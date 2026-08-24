@@ -208,7 +208,7 @@ describe('auth helpers', () => {
   it('triggers a blob download via a temporary anchor', () => {
     const click = vi.fn();
     const remove = vi.fn();
-    const createObjectURL = vi.fn(() => 'blob:pepcalc');
+    const createObjectURL = vi.fn(() => 'blob:peptrack');
     const revokeObjectURL = vi.fn();
     vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
     vi.spyOn(document, 'createElement').mockReturnValue({
@@ -219,10 +219,10 @@ describe('auth helpers', () => {
     } as unknown as HTMLAnchorElement);
     vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
 
-    triggerBlobDownload(new Blob(['sqlite']), 'pepcalc-export.sqlite');
+    triggerBlobDownload(new Blob(['sqlite']), 'peptrack-export.sqlite');
     expect(createObjectURL).toHaveBeenCalled();
     expect(click).toHaveBeenCalled();
     expect(remove).toHaveBeenCalled();
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:pepcalc');
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:peptrack');
   });
 });
