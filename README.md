@@ -2,7 +2,7 @@
 
 Personal compounding log for peptide doses. Mix a vial, log each use in IU against a named syringe, see milligrams deducted, and watch the active vial burn down.
 
-This repository currently ships **v0.1.1**. Mix a vial, log IU, remainder, settings syringes, empty/error states, PWA Add to Home Screen, login/Google rate limits, AMK rotation, and an authenticated sqlite export. Cookie sessions and encrypted user sqlite come from Phase 1. Bump `frontend/src/lib/version.ts` on every PR — Settings shows that string.
+This repository currently ships **v0.1.2**. Mix a vial, log IU, remainder, settings syringes, empty/error states, PWA Add to Home Screen, login/Google rate limits, AMK rotation, and an authenticated sqlite export. Cookie sessions and encrypted user sqlite come from Phase 1. Bump `frontend/src/lib/version.ts` on every PR — Settings and the login screen show that string.
 
 ## Quick start (Docker)
 
@@ -37,15 +37,31 @@ Auth (same origin, cookie `cimtapp_session`): `POST /api/v1/auth/register`, `/au
 
 ### Production
 
+`.env` needs a real `CIMT_MASTER_KEY` and Google OAuth (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`). Set `APP_URL` and `GOOGLE_REDIRECT_URI` to the public origin (or `http://localhost:25880` for a local prod compose).
+
+First start, from the repo directory:
+
 ```bash
-# .env needs a real CIMT_MASTER_KEY and Google OAuth (required when APP_ENV=production)
-# Set APP_URL and GOOGLE_REDIRECT_URI to http://localhost:25880 (or your public origin)
 make up-prod
 # or
 docker compose -f docker-compose.prod.yml up --build
 ```
 
-No PHP bind-mount. The SPA is baked into the image on `--build`. SQLite is still `./data` on the host.
+Later deploys, on the prod host (a git checkout of this repo):
+
+```bash
+make deploy
+# or
+./scripts/deploy.sh
+```
+
+`scripts/deploy.sh` checks out `main`, pulls with `git pull --rebase origin main`, then rebuilds and restarts the production `app` container in the background:
+
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+There is one production container. The SPA is baked into the image on `--build`; a restart without rebuild keeps the old app. SQLite stays on the host at `./data`, so ciphertext survives rebuilds. After deploy, the login screen (and Settings) show the version from `frontend/src/lib/version.ts`.
 
 ### First run
 
@@ -67,7 +83,7 @@ make frontend-build
 docker compose run --rm frontend npm run build
 ```
 
-`docker compose up --build` (dev) does not rebuild the SPA. Production bakes the SPA into the image, so `make up-prod` / `docker compose -f docker-compose.prod.yml up --build` picks up frontend changes.
+`docker compose up --build` (dev) does not rebuild the SPA. Production bakes the SPA into the image, so `make deploy` / `make up-prod` picks up frontend changes.
 
 Without Docker (PHP 8.3+ and Node 22/20):
 
@@ -113,6 +129,7 @@ frontend/                SvelteKit + adapter-static (SPA, no Svelte server)
 docs/                    DESIGN, work checklist, testing gates, backup / AMK rotation
 docker-compose.yml       development (PHP bind-mount, dummy AMK fallback)
 docker-compose.prod.yml  production (image only, Secure cookies, required AMK)
+scripts/deploy.sh        prod host: pull origin/main and rebuild the app container
 data/                    host sqlite + encrypted user stores (bind-mounted in both compose files)
 ```
 

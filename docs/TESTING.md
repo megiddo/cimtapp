@@ -69,4 +69,5 @@ make infection     # Infection in the PHP container
 make mutation      # Infection + Stryker
 make up            # docker compose up --build (dev)
 make up-prod       # docker compose -f docker-compose.prod.yml up --build
+make deploy        # git pull --rebase origin main, then prod compose up --build -d
 ```

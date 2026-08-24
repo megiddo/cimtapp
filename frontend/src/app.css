@@ -262,6 +262,18 @@ button.text {
   font-size: 0.85rem;
 }
 
+.login-screen {
+  box-sizing: border-box;
+  min-height: calc(100dvh - var(--tap-min) - env(safe-area-inset-top) - 2rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.login-screen .app-version {
+  margin-top: auto;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 .tone {
   font-size: 0.95rem;
 }
