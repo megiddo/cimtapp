@@ -50,7 +50,7 @@ No PHP bind-mount. The SPA is baked into the image on `--build`. SQLite is still
 ### First run
 
 1. Open the app URL. Unauthenticated routes send you to `/login`.
-2. **Need an account? Register.** Email plus a password of at least 12 characters. Skip **Continue with Google** unless `GOOGLE_CLIENT_ID` / `SECRET` and a matching redirect URI are set.
+2. **Need an account? Register.** Email plus a password of at least 12 characters. **Continue with Google** needs `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in gitignored `.env`, then recreate the app container. In Google Cloud, add authorized JavaScript origin `http://localhost:24780` and redirect URI `http://localhost:24780/api/v1/auth/google/callback`.
 3. Home is empty until a vial exists. Open **Inventory** → **Add to Inventory**:
    - bacteriostatic water (mixes deduct from the current bottle)
    - syringe types (a 0.5 mL / 50 IU type is seeded; stock starts at 0)

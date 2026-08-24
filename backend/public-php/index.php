@@ -13,6 +13,21 @@ use Slim\Factory\ServerRequestCreatorFactory;
 
 require __DIR__ . '/../vendor/autoload.php';
 
+foreach (
+    [
+        'GOOGLE_CLIENT_ID',
+        'GOOGLE_CLIENT_SECRET',
+        'GOOGLE_REDIRECT_URI',
+    ] as $emptyable
+) {
+    $current = getenv($emptyable);
+    if (is_string($current) && $current !== '') {
+        continue;
+    }
+    putenv($emptyable);
+    unset($_ENV[$emptyable], $_SERVER[$emptyable]);
+}
+
 $backendEnv = __DIR__ . '/../.env';
 if (is_file($backendEnv)) {
     Dotenv\Dotenv::createImmutable(__DIR__ . '/../')->safeLoad();

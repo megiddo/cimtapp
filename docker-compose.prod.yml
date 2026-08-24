@@ -24,6 +24,7 @@ services:
       SESSION_SECURE: "true"
     volumes:
       - ./data:/var/www/cimtapp/data
+      - ./.env:/var/www/cimtapp/.env:ro
       - type: tmpfs
         target: /var/www/cimtapp/data/tmp
     working_dir: /var/www/cimtapp/backend
