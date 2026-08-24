@@ -62,4 +62,35 @@ class SyringeServiceTest extends TestCase
             $this->assertSame(['id' => [DoseConfig::SYRINGE_LAST]], $e->fields());
         }
     }
+
+    public function testConsumeOneDebitsStockAndRejectsEmpty(): void
+    {
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->exec(
+            'CREATE TABLE syringe_profiles (
+                id TEXT PRIMARY KEY NOT NULL,
+                label TEXT NOT NULL,
+                volume_ml REAL NOT NULL,
+                capacity_iu REAL NOT NULL,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                quantity INTEGER NOT NULL DEFAULT 0
+            )'
+        );
+        $pdo->exec("INSERT INTO syringe_profiles (id, label, volume_ml, capacity_iu, is_default, quantity)
+                    VALUES ('s1', '0.5 mL / 50 IU', 0.5, 50, 1, 1)");
+
+        $service = new SyringeService(new IdGenerator());
+        $service->consumeOne($pdo, 's1');
+        $this->assertSame(0, $service->get($pdo, 's1')['quantity']);
+        $this->assertNull($service->fallbackProfile()['id']);
+        $this->assertSame(DoseConfig::FALLBACK_SYRINGE_VOLUME_ML, $service->fallbackProfile()['volume_ml']);
+
+        try {
+            $service->consumeOne($pdo, 's1');
+            $this->fail('expected empty stock to fail');
+        } catch (ValidationException $e) {
+            $this->assertSame(['syringe_id' => [DoseConfig::SYRINGE_STOCK_EMPTY]], $e->fields());
+        }
+    }
 }

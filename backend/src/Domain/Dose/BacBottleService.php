@@ -127,14 +127,26 @@ final class BacBottleService
         $stmt->execute([':id' => $id]);
     }
 
-    public function debitCurrent(PDO $pdo, float $ml): string
+    /**
+     * @return array<string, mixed>
+     */
+    public function burn(PDO $pdo, string $id, FieldParser $fields): array
+    {
+        $row = $this->findRow($pdo, $id);
+        if ($row === null) {
+            throw new DomainRecordNotFoundException(DoseConfig::BAC_UNKNOWN);
+        }
+
+        $this->debitRow($pdo, $row, $fields->requirePositiveFloat('ml'), 'ml');
+
+        return $this->get($pdo, $id);
+    }
+
+    public function debitCurrent(PDO $pdo, float $ml): ?string
     {
         $row = $this->currentRow($pdo);
         if ($row === null) {
-            throw new ValidationException(
-                ['bac_water_ml' => [DoseConfig::NO_BAC_BOTTLE]],
-                DoseConfig::NO_BAC_BOTTLE,
-            );
+            return null;
         }
 
         return $this->debitRow($pdo, $row, $ml);
@@ -189,7 +201,7 @@ final class BacBottleService
     /**
      * @param array<string, mixed> $row
      */
-    private function debitRow(PDO $pdo, array $row, float $ml): string
+    private function debitRow(PDO $pdo, array $row, float $ml, string $field = 'bac_water_ml'): string
     {
         $ml = $this->doses->roundVolume($ml);
         $remaining = (float) $row['remaining_ml'];
@@ -198,7 +210,7 @@ final class BacBottleService
                 DoseConfig::trimNumber($ml),
                 DoseConfig::trimNumber($this->doses->roundVolume($remaining)),
             );
-            throw new ValidationException(['bac_water_ml' => [$message]], $message);
+            throw new ValidationException([$field => [$message]], $message);
         }
 
         $this->setRemaining($pdo, (string) $row['id'], $this->doses->roundVolume($remaining - $ml));

@@ -1,6 +1,6 @@
 {
     "name": "megiddo/cimtapp",
-    "description": "CIMTapp — Compounded Incretin Mimetic Tracking App (Slim 4 API)",
+    "description": "PepCalc — personal compounding log (Slim 4 API)",
     "license": "MIT",
     "type": "project",
     "require": {

@@ -191,7 +191,7 @@
       {#if bacBottle}
         <span class="muted">{formatMl(bacBottle.remaining_ml)} mL remaining in current bottle</span>
       {:else}
-        <span class="muted">Add a BAC bottle first — mixes deduct from it.</span>
+        <span class="muted">Optional: add a BAC bottle to track remaining water.</span>
       {/if}
       {#if firstFieldError(fields, 'bac_water_ml')}
         <span class="field-error">{firstFieldError(fields, 'bac_water_ml')}</span>
@@ -213,7 +213,7 @@
     </label>
 
     <div class="sticky-cta">
-      <button type="submit" disabled={pending || mg === null || bac === null || bacBottle === null}>{pending ? 'Adding…' : 'Add to Inventory'}</button>
+      <button type="submit" disabled={pending || mg === null || bac === null}>{pending ? 'Adding…' : 'Add to Inventory'}</button>
     </div>
   </form>
 {/if}

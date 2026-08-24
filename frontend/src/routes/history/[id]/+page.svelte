@@ -4,6 +4,8 @@
   import { onMount } from 'svelte';
   import {
     concentrationFromUse,
+    FALLBACK_SYRINGE_CAPACITY_IU,
+    FALLBACK_SYRINGE_VOLUME_ML,
     formatDoseLine,
     formatMg,
     parseIuInput,
@@ -31,14 +33,19 @@
   const iu = $derived(parseIuInput(iuText));
   const syringe = $derived(syringes.find((item) => item.id === syringeId) ?? null);
   const comparedMg = $derived.by(() => {
-    if (original === null || syringe === null || iu === null) {
+    if (original === null || iu === null) {
       return null;
     }
     const conc = concentrationFromUse(original.peptide_mg, original.volume_ml);
     if (conc === null) {
       return null;
     }
-    return peptideMgAtConcentration(iu, conc, syringe.volume_ml, syringe.capacity_iu);
+    return peptideMgAtConcentration(
+      iu,
+      conc,
+      syringe?.volume_ml ?? FALLBACK_SYRINGE_VOLUME_ML,
+      syringe?.capacity_iu ?? FALLBACK_SYRINGE_CAPACITY_IU
+    );
   });
 
   onMount(async () => {
@@ -51,7 +58,7 @@
     syringes = await fetchSyringes();
     if (original !== null) {
       iuText = String(original.iu);
-      syringeId = original.syringe_id ?? syringes[0]?.id ?? '';
+      syringeId = original.syringe_id ?? '';
       notes = original.notes ?? '';
       const parsed = new Date(original.used_at);
       usedAt = Number.isNaN(parsed.getTime()) ? original.used_at : toDatetimeLocalValue(parsed);
@@ -74,7 +81,7 @@
       const result = await saveWhileOnline(() =>
         patchUse(target.id, {
           iu,
-          syringe_id: syringeId || undefined,
+          syringe_id: syringeId === '' ? null : syringeId,
           used_at: usedAt,
           notes: notes === '' ? null : notes
         })
@@ -147,6 +154,7 @@
     <label>
       Syringe
       <select bind:value={syringeId}>
+        <option value="">None</option>
         {#each syringes as item (item.id)}
           <option value={item.id}>{item.label}</option>
         {/each}

@@ -28,7 +28,8 @@ import {
   parseCountInput,
   remainingIuFrom,
   restockSyringe,
-  burnSyringe
+  burnSyringe,
+  burnBacBottle
 } from './inventory';
 
 function jsonResponse(status: number, body: unknown) {
@@ -422,5 +423,30 @@ describe('inventory API client', () => {
       )
     );
     await expect(burnSyringe('s1', 3)).resolves.toMatchObject({ ok: false, status: 422 });
+  });
+
+  it('burns BAC independently of mixes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(200, { statusCode: 200, data: { id: 'b1', remaining_ml: 7.5 } })
+      )
+    );
+    await expect(burnBacBottle('b1', 2.5)).resolves.toMatchObject({ ok: true, status: 200 });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(422, {
+          statusCode: 422,
+          error: {
+            type: 'VALIDATION_ERROR',
+            description: '3 mL exceeds 0 mL remaining in bacteriostatic water.',
+            fields: { ml: ['3 mL exceeds 0 mL remaining in bacteriostatic water.'] }
+          }
+        })
+      )
+    );
+    await expect(burnBacBottle('b1', 3)).resolves.toMatchObject({ ok: false, status: 422 });
   });
 });

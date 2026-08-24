@@ -452,7 +452,8 @@ class DoseHttpTest extends TestCase
         $emptySyringe = $this->authedJson($app, 'PATCH', '/api/v1/uses/' . $lateA['id'], [
             'syringe_id' => '',
         ], $sid);
-        $this->assertSame(422, $emptySyringe->getStatusCode());
+        $this->assertSame(200, $emptySyringe->getStatusCode());
+        $this->assertNull($this->json($emptySyringe)['data']['syringe_id']);
     }
 
     public function testMixValidationUnknownPeptideAndNonU100Dose(): void
@@ -499,18 +500,6 @@ class DoseHttpTest extends TestCase
         $missingCurrent = $this->authed($app, 'GET', '/api/v1/bac-bottles/current', $sid);
         $this->assertSame(404, $missingCurrent->getStatusCode());
         $this->assertSame([], $this->json($this->authed($app, 'GET', '/api/v1/bac-bottles', $sid))['data']);
-
-        $noBottle = $this->authedJson($app, 'POST', '/api/v1/compounds', [
-            'peptide_type_id' => 'tirzepatide',
-            'peptide_mg' => 10,
-            'bac_water_ml' => 2,
-            'compounded_at' => '2026-08-20T12:00',
-        ], $sid);
-        $this->assertSame(422, $noBottle->getStatusCode());
-        $this->assertSame(
-            ['bac_water_ml' => [DoseConfig::NO_BAC_BOTTLE]],
-            $this->json($noBottle)['error']['fields']
-        );
 
         $created = $this->authedJson($app, 'POST', '/api/v1/bac-bottles', [
             'volume_ml' => 10,
@@ -574,6 +563,61 @@ class DoseHttpTest extends TestCase
         $this->assertSame(204, $this->authed($app, 'DELETE', '/api/v1/bac-bottles/' . $plain['id'], $sid)->getStatusCode());
         $this->assertSame(404, $this->authed($app, 'GET', '/api/v1/bac-bottles/' . $bottle['id'], $sid)->getStatusCode());
         $this->assertSame(404, $this->authed($app, 'DELETE', '/api/v1/bac-bottles/missing', $sid)->getStatusCode());
+    }
+
+    public function testMixAndLogDoNotRequireBacOrSyringeStock(): void
+    {
+        $app = $this->getAppInstance();
+        $sid = $this->register($app, restockSyringes: false);
+
+        $mixed = $this->authedJson($app, 'POST', '/api/v1/compounds', [
+            'peptide_type_id' => 'tirzepatide',
+            'peptide_mg' => 10,
+            'bac_water_ml' => 2,
+            'compounded_at' => '2026-08-20T12:00',
+        ], $sid);
+        $this->assertSame(201, $mixed->getStatusCode());
+        $this->assertNull($this->json($mixed)['data']['bac_bottle_id']);
+
+        $syringeId = $this->json($this->authed($app, 'GET', '/api/v1/syringes', $sid))['data'][0]['id'];
+        $this->assertSame(0, $this->syringeQuantity($app, $sid, $syringeId));
+
+        $use = $this->authedJson($app, 'POST', '/api/v1/uses', ['iu' => 10], $sid);
+        $this->assertSame(201, $use->getStatusCode());
+        $this->assertSame(0, $this->syringeQuantity($app, $sid, $syringeId));
+
+        $withoutSyringe = $this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 5,
+            'syringe_id' => null,
+        ], $sid);
+        $this->assertSame(201, $withoutSyringe->getStatusCode());
+        $this->assertNull($this->json($withoutSyringe)['data']['syringe_id']);
+        $this->assertEqualsWithDelta(0.5, $this->json($withoutSyringe)['data']['syringe_volume_ml'], 1e-9);
+        $this->assertEqualsWithDelta(50.0, $this->json($withoutSyringe)['data']['syringe_capacity_iu'], 1e-9);
+    }
+
+    public function testBacBottleBurnIsIndependentOfUses(): void
+    {
+        $app = $this->getAppInstance();
+        $sid = $this->register($app, restockSyringes: false);
+        $bottle = $this->json($this->authedJson($app, 'POST', '/api/v1/bac-bottles', [
+            'volume_ml' => 10,
+        ], $sid))['data'];
+
+        $burned = $this->json($this->authedJson($app, 'POST', '/api/v1/bac-bottles/' . $bottle['id'] . '/burn', [
+            'ml' => 2.5,
+        ], $sid))['data'];
+        $this->assertEqualsWithDelta(7.5, $burned['remaining_ml'], 1e-9);
+
+        $over = $this->authedJson($app, 'POST', '/api/v1/bac-bottles/' . $bottle['id'] . '/burn', [
+            'ml' => 20,
+        ], $sid);
+        $this->assertSame(422, $over->getStatusCode());
+        $this->assertArrayHasKey('ml', $this->json($over)['error']['fields']);
+
+        $this->assertSame(404, $this->authedJson($app, 'POST', '/api/v1/bac-bottles/missing/burn', [
+            'ml' => 1,
+        ], $sid)->getStatusCode());
     }
 
     public function testBacMixPatchAdjustsBottleAndNewerBottleBecomesCurrent(): void
@@ -666,7 +710,7 @@ class DoseHttpTest extends TestCase
 
         $this->mixTirzepatide($app, $sid, '2026-08-20T12:00');
         $this->authedJson($app, 'POST', '/api/v1/uses', ['iu' => 10], $sid);
-        $this->assertSame(54, $this->json($this->authed($app, 'GET', '/api/v1/syringes', $sid))['data'][0]['quantity']);
+        $this->assertSame(55, $this->json($this->authed($app, 'GET', '/api/v1/syringes', $sid))['data'][0]['quantity']);
 
         $alt = $this->json($this->authedJson($app, 'POST', '/api/v1/syringes', [
             'volume_ml' => 1,
@@ -677,25 +721,22 @@ class DoseHttpTest extends TestCase
             'iu' => 10,
             'syringe_id' => $alt['id'],
         ], $sid))['data'];
-        $this->assertSame(2, $this->syringeQuantity($app, $sid, $alt['id']));
-        $this->assertSame(54, $this->syringeQuantity($app, $sid, $syringeId));
+        $this->assertSame(3, $this->syringeQuantity($app, $sid, $alt['id']));
+        $this->assertSame(55, $this->syringeQuantity($app, $sid, $syringeId));
 
         $this->authedJson($app, 'PATCH', '/api/v1/uses/' . $use['id'], [
             'syringe_id' => $syringeId,
         ], $sid);
         $this->assertSame(3, $this->syringeQuantity($app, $sid, $alt['id']));
-        $this->assertSame(53, $this->syringeQuantity($app, $sid, $syringeId));
+        $this->assertSame(55, $this->syringeQuantity($app, $sid, $syringeId));
 
         $this->authed($app, 'DELETE', '/api/v1/uses/' . $use['id'], $sid);
-        $this->assertSame(54, $this->syringeQuantity($app, $sid, $syringeId));
+        $this->assertSame(55, $this->syringeQuantity($app, $sid, $syringeId));
 
-        $this->authedJson($app, 'POST', '/api/v1/syringes/' . $syringeId . '/burn', ['count' => 54], $sid);
+        $this->authedJson($app, 'POST', '/api/v1/syringes/' . $syringeId . '/burn', ['count' => 55], $sid);
         $empty = $this->authedJson($app, 'POST', '/api/v1/uses', ['iu' => 5], $sid);
-        $this->assertSame(422, $empty->getStatusCode());
-        $this->assertSame(
-            ['syringe_id' => [DoseConfig::SYRINGE_STOCK_EMPTY]],
-            $this->json($empty)['error']['fields']
-        );
+        $this->assertSame(201, $empty->getStatusCode());
+        $this->assertSame(0, $this->syringeQuantity($app, $sid, $syringeId));
 
         $missing = $this->authedJson($app, 'POST', '/api/v1/syringes/missing/restock', ['count' => 1], $sid);
         $this->assertSame(404, $missing->getStatusCode());

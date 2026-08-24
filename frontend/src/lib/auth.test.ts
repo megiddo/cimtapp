@@ -7,7 +7,10 @@ import {
   PASSWORD_MIN_LENGTH,
   readAction,
   setPassword,
-  submitCredentials
+  submitCredentials,
+  USER_EXPORT_FILENAME,
+  downloadUserSqlite,
+  triggerBlobDownload
 } from './auth';
 
 describe('auth helpers', () => {
@@ -172,5 +175,54 @@ describe('auth helpers', () => {
       })
     );
     await expect(readAction('/api/v1/me')).resolves.toEqual({ statusCode: 503 });
+  });
+
+  it('downloads the logged-in sqlite export', async () => {
+    const blob = new Blob(['SQLite format 3'], { type: 'application/octet-stream' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        blob: async () => blob
+      })
+    );
+    const save = vi.fn();
+    await expect(downloadUserSqlite('', save)).resolves.toEqual({ ok: true });
+    expect(save).toHaveBeenCalledWith(blob, USER_EXPORT_FILENAME);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        blob: async () => new Blob()
+      })
+    );
+    await expect(downloadUserSqlite('', save)).resolves.toEqual({
+      ok: false,
+      message: 'Unable to download your data.'
+    });
+  });
+
+  it('triggers a blob download via a temporary anchor', () => {
+    const click = vi.fn();
+    const remove = vi.fn();
+    const createObjectURL = vi.fn(() => 'blob:pepcalc');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+    vi.spyOn(document, 'createElement').mockReturnValue({
+      href: '',
+      download: '',
+      click,
+      remove
+    } as unknown as HTMLAnchorElement);
+    vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+
+    triggerBlobDownload(new Blob(['sqlite']), 'pepcalc-export.sqlite');
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(click).toHaveBeenCalled();
+    expect(remove).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:pepcalc');
   });
 });

@@ -1,0 +1,8 @@
+---
+description: Bump the Settings-visible app version on every PR.
+alwaysApply: true
+---
+
+# App version
+
+Every pull request must bump `frontend/src/lib/version.ts` (`APP_VERSION`, `vMAJOR.MINOR.PATCH`). Settings shows this string at the bottom of the page. Keep `frontend/src/lib/version.test.ts` format check passing (`vMAJOR.MINOR.PATCH`). Name the version in the PR body.

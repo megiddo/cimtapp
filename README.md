@@ -1,8 +1,8 @@
-# CIMTapp
+# PepCalc
 
-Compounded Incretin Mimetic Tracking App: a personal compounding log. Mix a vial, log each use in IU against a named syringe, see milligrams deducted, and watch the active vial burn down.
+Personal compounding log for peptide doses. Mix a vial, log each use in IU against a named syringe, see milligrams deducted, and watch the active vial burn down.
 
-This repository currently ships **v1 (Phase 3)**: mix a vial, log IU, remainder, settings syringes, empty/error states, PWA Add to Home Screen, login/Google rate limits, AMK rotation, and an authenticated sqlite export. Cookie sessions and encrypted user sqlite come from Phase 1.
+This repository currently ships **v0.1.0**. Mix a vial, log IU, remainder, settings syringes, empty/error states, PWA Add to Home Screen, login/Google rate limits, AMK rotation, and an authenticated sqlite export. Cookie sessions and encrypted user sqlite come from Phase 1. Bump `frontend/src/lib/version.ts` on every PR — Settings shows that string.
 
 ## Quick start (Docker)
 

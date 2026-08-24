@@ -2,11 +2,12 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { formatMl } from '$lib/dose';
+  import { formatMl, parseIuInput } from '$lib/dose';
   import { toDatetimeLocalValue } from '$lib/datetime';
   import { OFFLINE_SAVE_MESSAGE, saveWhileOnline } from '$lib/offline';
   import { firstFieldError, type FieldMap } from '$lib/payload';
   import {
+    burnBacBottle,
     deleteBacBottle,
     fetchBacBottle,
     patchBacBottle,
@@ -16,16 +17,20 @@
   let bottle = $state<BacBottle | null>(null);
   let openedAt = $state('');
   let notes = $state('');
+  let burnMl = $state('1');
   let pending = $state(false);
+  let pendingBurn = $state(false);
   let deleting = $state(false);
   let fields = $state<FieldMap>({});
   let formError = $state('');
+  let burnMessage = $state('');
   let toast = $state('');
   let loaded = $state(false);
 
   const unused = $derived(
     bottle !== null && Math.abs(bottle.remaining_ml - bottle.volume_ml) < 1e-9
   );
+  const burnAmount = $derived(parseIuInput(burnMl));
 
   onMount(async () => {
     const id = page.params.id;
@@ -68,6 +73,28 @@
       formError = result.message;
     } catch {
       pending = false;
+      toast = OFFLINE_SAVE_MESSAGE;
+    }
+  }
+
+  async function onBurn() {
+    const target = bottle;
+    if (target === null || burnAmount === null || burnAmount <= 0) {
+      return;
+    }
+    pendingBurn = true;
+    burnMessage = '';
+    toast = '';
+    try {
+      const result = await saveWhileOnline(() => burnBacBottle(target.id, burnAmount));
+      pendingBurn = false;
+      if (result.ok) {
+        bottle = result.data;
+        return;
+      }
+      burnMessage = firstFieldError(result.fields, 'ml') ?? result.message;
+    } catch {
+      pendingBurn = false;
       toast = OFFLINE_SAVE_MESSAGE;
     }
   }
@@ -120,6 +147,23 @@
     </p>
     <p class="muted">{formatMl(bottle.volume_ml)} mL bottle</p>
 
+    {#if bottle.remaining_ml > 0}
+      <div class="stock-actions">
+        <input inputmode="decimal" aria-label="mL to burn" bind:value={burnMl} placeholder="1" />
+        <button
+          type="button"
+          class="secondary stock"
+          disabled={pendingBurn || pending || deleting || burnAmount === null || burnAmount <= 0}
+          onclick={onBurn}>Use</button
+        >
+      </div>
+      {#if burnMessage}
+        <p class="field-error">{burnMessage}</p>
+      {/if}
+    {:else}
+      <p class="muted">This bottle is empty.</p>
+    {/if}
+
     <label>
       Opened at
       <input type="datetime-local" bind:value={openedAt} />
@@ -149,6 +193,6 @@
       {deleting ? 'Deleting…' : 'Delete from inventory'}
     </button>
   {:else}
-    <p class="muted below-fold">Delete is unavailable after this bottle has been used for a mix.</p>
+    <p class="muted below-fold">Delete is unavailable after remaining water has changed.</p>
   {/if}
 {/if}
