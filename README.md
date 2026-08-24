@@ -2,7 +2,7 @@
 
 Personal compounding log for peptide doses. Mix a vial, log each use in IU against a named syringe, see milligrams deducted, and watch the active vial burn down.
 
-This repository currently ships **v0.1.2**. Mix a vial, log IU, remainder, settings syringes, empty/error states, PWA Add to Home Screen, login/Google rate limits, AMK rotation, and an authenticated sqlite export. Cookie sessions and encrypted user sqlite come from Phase 1. Bump `frontend/src/lib/version.ts` on every PR — Settings and the login screen show that string.
+This repository currently ships **v0.1.3**. Mix a vial, log IU, remainder, settings syringes, empty/error states, PWA Add to Home Screen, login/Google rate limits, AMK rotation, and an authenticated sqlite export. Cookie sessions and encrypted user sqlite come from Phase 1. Bump `frontend/src/lib/version.ts` on every PR — Settings and the login screen show that string.
 
 ## Quick start (Docker)
 
