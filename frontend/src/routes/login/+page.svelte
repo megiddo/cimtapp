@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import { tick } from 'svelte';
   import { googleStartUrl, PASSWORD_MIN_LENGTH, submitCredentials } from '$lib/auth';
   import { firstFieldError, type FieldMap } from '$lib/payload';
   import { APP_VERSION } from '$lib/version';
@@ -11,6 +12,8 @@
   let pending = $state(false);
   let formError = $state('');
   let fields = $state<FieldMap>({});
+  let passwordFormOpen = $state(false);
+  let emailInput: HTMLInputElement | undefined = $state();
 
   const googleError = $derived(page.url.searchParams.get('error') === 'google');
 
@@ -27,6 +30,12 @@
     }
     fields = result.fields;
     formError = result.message;
+  }
+
+  async function revealPasswordForm() {
+    passwordFormOpen = true;
+    await tick();
+    emailInput?.focus();
   }
 </script>
 
@@ -57,54 +66,69 @@
     Continue with Google
   </a>
 
-  <form class="auth-form" onsubmit={onSubmit}>
-    <label>
-      Email
-      <input type="email" name="email" autocomplete="username" bind:value={email} required />
-      {#if firstFieldError(fields, 'email')}
-        <span class="field-error">{firstFieldError(fields, 'email')}</span>
+  <p class="auth-divider" role="separator"><span>or</span></p>
+
+  {#if passwordFormOpen}
+    <form class="auth-form" onsubmit={onSubmit}>
+      <label>
+        Email
+        <input
+          type="email"
+          name="email"
+          autocomplete="username"
+          bind:this={emailInput}
+          bind:value={email}
+          required
+        />
+        {#if firstFieldError(fields, 'email')}
+          <span class="field-error">{firstFieldError(fields, 'email')}</span>
+        {/if}
+      </label>
+
+      <label>
+        Password
+        <input
+          type="password"
+          name="password"
+          autocomplete={mode === 'register' ? 'new-password' : 'current-password'}
+          minlength={PASSWORD_MIN_LENGTH}
+          bind:value={password}
+          required
+        />
+        {#if firstFieldError(fields, 'password')}
+          <span class="field-error">{firstFieldError(fields, 'password')}</span>
+        {/if}
+      </label>
+
+      {#if formError && !firstFieldError(fields, 'email') && !firstFieldError(fields, 'password')}
+        <p class="field-error" role="alert">{formError}</p>
       {/if}
-    </label>
 
-    <label>
-      Password
-      <input
-        type="password"
-        name="password"
-        autocomplete={mode === 'register' ? 'new-password' : 'current-password'}
-        minlength={PASSWORD_MIN_LENGTH}
-        bind:value={password}
-        required
-      />
-      {#if firstFieldError(fields, 'password')}
-        <span class="field-error">{firstFieldError(fields, 'password')}</span>
-      {/if}
-    </label>
+      <button type="submit" disabled={pending}>
+        {#if pending}
+          Working…
+        {:else if mode === 'register'}
+          Create account
+        {:else}
+          Sign in
+        {/if}
+      </button>
+    </form>
 
-    {#if formError && !firstFieldError(fields, 'email') && !firstFieldError(fields, 'password')}
-      <p class="field-error" role="alert">{formError}</p>
-    {/if}
-
-    <button type="submit" disabled={pending}>
-      {#if pending}
-        Working…
-      {:else if mode === 'register'}
-        Create account
+    <p class="switch">
+      {#if mode === 'login'}
+        Need an account?
+        <button type="button" class="text" onclick={() => (mode = 'register')}>Register</button>
       {:else}
-        Sign in
+        Already have an account?
+        <button type="button" class="text" onclick={() => (mode = 'login')}>Sign in</button>
       {/if}
+    </p>
+  {:else}
+    <button type="button" class="password-login" onclick={revealPasswordForm}>
+      Login with Password
     </button>
-  </form>
-
-  <p class="switch">
-    {#if mode === 'login'}
-      Need an account?
-      <button type="button" class="text" onclick={() => (mode = 'register')}>Register</button>
-    {:else}
-      Already have an account?
-      <button type="button" class="text" onclick={() => (mode = 'login')}>Sign in</button>
-    {/if}
-  </p>
+  {/if}
 
   <p class="muted app-version">{APP_VERSION}</p>
 </div>

@@ -1,2 +1,2 @@
 /** Semver shown on login and in Settings. Bump this on every PR. */
-export const APP_VERSION = 'v0.1.3';
+export const APP_VERSION = 'v0.1.4';
