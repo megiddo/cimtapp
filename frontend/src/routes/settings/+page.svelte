@@ -2,7 +2,8 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { logout, PASSWORD_MIN_LENGTH, setPassword, type Me } from '$lib/auth';
+  import { logout, PASSWORD_MIN_LENGTH, downloadUserSqlite, setPassword, type Me } from '$lib/auth';
+  import { APP_VERSION } from '$lib/version';
   import { parseIuInput, syringeLabel } from '$lib/dose';
   import {
     createSyringe,
@@ -25,6 +26,8 @@
   let syringeFields = $state<FieldMap>({});
   let syringeMessage = $state('');
   let loaded = $state(false);
+  let pendingExport = $state(false);
+  let exportMessage = $state('');
 
   const volume = $derived(parseIuInput(volumeMl));
   const capacity = $derived(parseIuInput(capacityIu));
@@ -90,6 +93,16 @@
   async function onLogout() {
     await logout();
     await goto('/login');
+  }
+
+  async function onDownloadSqlite() {
+    pendingExport = true;
+    exportMessage = '';
+    const result = await downloadUserSqlite();
+    pendingExport = false;
+    if (!result.ok) {
+      exportMessage = result.message;
+    }
   }
 </script>
 
@@ -166,4 +179,17 @@
   <button type="submit" disabled={pendingPassword}>{pendingPassword ? 'Saving…' : 'Save password'}</button>
 </form>
 
+<section>
+  <h2 class="day-heading">Your data</h2>
+  <p class="muted">Download this account’s sqlite database.</p>
+  {#if exportMessage}
+    <p class="field-error">{exportMessage}</p>
+  {/if}
+  <button type="button" class="secondary" disabled={pendingExport} onclick={onDownloadSqlite}>
+    {pendingExport ? 'Downloading…' : 'Download sqlite'}
+  </button>
+</section>
+
 <button type="button" class="secondary" onclick={onLogout}>Log out</button>
+
+<p class="muted app-version">{APP_VERSION}</p>

@@ -104,7 +104,7 @@ describe('titleForPath', () => {
     expect(titleForPath('/login/x')).toBe('Sign in');
     expect(titleForPath('/settings')).toBe('Settings');
     expect(titleForPath('/settings/syringes')).toBe('Settings');
-    expect(titleForPath('/unknown')).toBe('CIMTapp');
+    expect(titleForPath('/unknown')).toBe('PepCalc');
   });
 });
 

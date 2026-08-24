@@ -1,6 +1,6 @@
 {
-  "name": "CIMTapp",
-  "short_name": "CIMTapp",
+  "name": "PepCalc",
+  "short_name": "PepCalc",
   "description": "Personal compounding log for incretin mimetics.",
   "start_url": "/",
   "display": "standalone",

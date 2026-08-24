@@ -7,6 +7,7 @@ use App\Application\Actions\Auth\GoogleStartAction;
 use App\Application\Actions\Auth\LoginAction;
 use App\Application\Actions\Auth\LogoutAction;
 use App\Application\Actions\Auth\RegisterAction;
+use App\Application\Actions\BacBottles\BurnBacBottleAction;
 use App\Application\Actions\BacBottles\CreateBacBottleAction;
 use App\Application\Actions\BacBottles\CurrentBacBottleAction;
 use App\Application\Actions\BacBottles\DeleteBacBottleAction;
@@ -69,6 +70,7 @@ return function (App $app): void {
             $authed->get('/bac-bottles/{id}', ViewBacBottleAction::class);
             $authed->patch('/bac-bottles/{id}', PatchBacBottleAction::class);
             $authed->delete('/bac-bottles/{id}', DeleteBacBottleAction::class);
+            $authed->post('/bac-bottles/{id}/burn', BurnBacBottleAction::class);
             $authed->get('/compounds', ListCompoundsAction::class);
             $authed->post('/compounds', CreateCompoundAction::class);
             $authed->get('/compounds/current', CurrentCompoundAction::class);

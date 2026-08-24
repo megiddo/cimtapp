@@ -24,6 +24,7 @@ services:
       - ./backend:/var/www/cimtapp/backend
       - ./docs:/var/www/cimtapp/docs
       - ./data:/var/www/cimtapp/data
+      - ./.env:/var/www/cimtapp/.env:ro
       - type: tmpfs
         target: /var/www/cimtapp/data/tmp
     working_dir: /var/www/cimtapp/backend

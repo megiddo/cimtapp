@@ -28,7 +28,7 @@ return function (ContainerBuilder $containerBuilder): void {
             $fromGetenv[$key] = $value;
         }
     }
-    $env = array_merge($fromGetenv, $_ENV, $_SERVER);
+    $env = $validator->mergeProcessEnv($_SERVER, $_ENV, $fromGetenv);
     $validated = $validator->validate($env);
 
     $containerBuilder->addDefinitions([

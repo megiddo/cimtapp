@@ -20,6 +20,10 @@ final class DoseConfig
 
     public const USES_MAX_LIMIT = 100;
 
+    public const FALLBACK_SYRINGE_VOLUME_ML = 0.5;
+
+    public const FALLBACK_SYRINGE_CAPACITY_IU = 50.0;
+
     public const IU_NOT_POSITIVE = 'IU must be greater than 0.';
 
     public const IU_ONE_DECIMAL = 'IU allows one decimal place.';

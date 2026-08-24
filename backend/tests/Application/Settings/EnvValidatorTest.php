@@ -249,4 +249,17 @@ class EnvValidatorTest extends TestCase
             'GOOGLE_REDIRECT_URI' => 'https://cimt.example/callback',
         ]));
     }
+
+    public function testMergeProcessEnvLetsNonEmptyDotenvBeatEmptyApachePlaceholders(): void
+    {
+        $merged = $this->validator->mergeProcessEnv(
+            ['GOOGLE_CLIENT_ID' => '', 'CIMT_MASTER_KEY' => self::HEX_KEY],
+            ['GOOGLE_CLIENT_ID' => 'id.apps.googleusercontent.com'],
+            ['GOOGLE_CLIENT_SECRET' => 'secret'],
+        );
+
+        $this->assertSame('id.apps.googleusercontent.com', $merged['GOOGLE_CLIENT_ID']);
+        $this->assertSame('secret', $merged['GOOGLE_CLIENT_SECRET']);
+        $this->assertSame(self::HEX_KEY, $merged['CIMT_MASTER_KEY']);
+    }
 }

@@ -50,15 +50,34 @@ class BacBottleServiceTest extends TestCase
         $this->assertEqualsWithDelta(9.0, $service->get($pdo, (string) $bottle['id'])['remaining_ml'], 1e-9);
     }
 
-    public function testApplyMixDeltaWithoutBottleThrows(): void
+    public function testApplyMixDeltaWithoutBottleSkipsDebit(): void
     {
         $pdo = $this->pdo();
         $service = $this->service();
+        $this->assertNull($service->applyMixDelta($pdo, null, 0.0, 2.0));
+        $this->assertSame([], $service->list($pdo));
+    }
+
+    public function testBurnDebitsRemainingAndRejectsOverdraw(): void
+    {
+        $pdo = $this->pdo();
+        $service = $this->service();
+        $bottle = $service->create($pdo, FieldParser::from(['volume_ml' => 10]));
+        $burned = $service->burn($pdo, (string) $bottle['id'], FieldParser::from(['ml' => 1.5]));
+        $this->assertEqualsWithDelta(8.5, $burned['remaining_ml'], 1e-9);
+
         try {
-            $service->applyMixDelta($pdo, null, 0.0, 2.0);
+            $service->burn($pdo, (string) $bottle['id'], FieldParser::from(['ml' => 20]));
             $this->fail('expected');
         } catch (ValidationException $e) {
-            $this->assertSame(['bac_water_ml' => [DoseConfig::NO_BAC_BOTTLE]], $e->fields());
+            $this->assertArrayHasKey('ml', $e->fields());
+        }
+
+        try {
+            $service->burn($pdo, 'missing', FieldParser::from(['ml' => 1]));
+            $this->fail('expected');
+        } catch (\App\Domain\DomainException\DomainRecordNotFoundException $e) {
+            $this->assertSame(DoseConfig::BAC_UNKNOWN, $e->getMessage());
         }
     }
 

@@ -190,6 +190,20 @@ export async function patchBacBottle(
   return asResult(payload, 'Unable to save bottle.');
 }
 
+export async function burnBacBottle(
+  id: string,
+  ml: number,
+  baseUrl = ''
+): Promise<DomainResult<BacBottle>> {
+  const payload = await readAction<BacBottle>(`/api/v1/bac-bottles/${id}/burn`, {
+    baseUrl,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ml })
+  });
+  return asResult(payload, 'Unable to burn bacteriostatic water.');
+}
+
 export async function deleteBacBottle(id: string, baseUrl = ''): Promise<DomainResult<null>> {
   const payload = await readAction<null>(`/api/v1/bac-bottles/${id}`, {
     baseUrl,
@@ -288,7 +302,7 @@ export async function deleteCompound(id: string, baseUrl = ''): Promise<DomainRe
 export async function logUse(
   body: {
     iu: number;
-    syringe_id?: string;
+    syringe_id?: string | null;
     used_at?: string;
     notes?: string | null;
     compound_id?: string;
@@ -308,7 +322,7 @@ export async function patchUse(
   id: string,
   body: {
     iu?: number;
-    syringe_id?: string;
+    syringe_id?: string | null;
     used_at?: string;
     notes?: string | null;
   },

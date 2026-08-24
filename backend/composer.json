@@ -1,6 +1,6 @@
 {
     "name": "megiddo/cimtapp",
-    "description": "CIMTapp — Compounded Incretin Mimetic Tracking App (Slim 4 API)",
+    "description": "PepCalc — personal compounding log (Slim 4 API)",
     "license": "MIT",
     "type": "project",
     "require": {
@@ -9,6 +9,7 @@
         "ext-pdo": "*",
         "ext-pdo_sqlite": "*",
         "ext-sodium": "*",
+        "league/oauth2-google": "^5.0",
         "monolog/monolog": "^3.8",
         "php-di/php-di": "^7.0",
         "slim/psr7": "^1.7",

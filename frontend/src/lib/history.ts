@@ -38,6 +38,20 @@ export function formatTime(iso: string, locale = 'en-US'): string {
   return date.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
 }
 
+export function formatDateTime(iso: string, locale = 'en-US'): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  return date.toLocaleString(locale, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
 export function groupUsesByLocalDay<T extends HistoryUse>(uses: T[], locale = 'en-US'): DayGroup<T>[] {
   const groups: DayGroup<T>[] = [];
   for (const use of uses) {

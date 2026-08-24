@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { formatConcentration, formatDoseLine, formatMg, formatMl, formatIu } from '$lib/dose';
-  import { formatTime } from '$lib/history';
+  import { formatDateTime } from '$lib/history';
   import { remainderTone, remainderToneMessage } from '$lib/remainder';
   import { fetchCurrentCompound, fetchUses, type Compound, type LoggedUse } from '$lib/inventory';
 
@@ -55,7 +55,7 @@
         <a class="row" href="/history/{use.id}">
           <span>
             <span class="primary">{formatDoseLine(use.iu, use.peptide_mg)}</span>
-            <div class="secondary">{formatTime(use.used_at)} · {use.peptide_type_name}</div>
+            <div class="secondary">{formatDateTime(use.used_at)} · {use.peptide_type_name}</div>
           </span>
         </a>
       {/each}

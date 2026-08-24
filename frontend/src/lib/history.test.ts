@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDayHeading, formatTime, groupUsesByLocalDay, localDayKey } from './history';
+import { formatDayHeading, formatDateTime, formatTime, groupUsesByLocalDay, localDayKey } from './history';
 
 const sample = (id: string, usedAt: string) => ({
   id,
@@ -18,6 +18,10 @@ describe('history grouping', () => {
     expect(formatDayHeading('2026-08-20', 'en-US')).toContain('20');
     expect(formatDayHeading('bad', 'en-US')).toBe('bad');
     expect(formatTime('not-a-date')).toBe('');
+    expect(formatDateTime('not-a-date')).toBe('');
+    expect(formatDateTime(new Date(2026, 7, 20, 9, 5).toISOString(), 'en-US')).toMatch(/Aug/);
+    expect(formatDateTime(new Date(2026, 7, 20, 9, 5).toISOString(), 'en-US')).toMatch(/20/);
+    expect(formatDateTime(new Date(2026, 7, 20, 9, 5).toISOString(), 'en-US')).toMatch(/2026/);
   });
 
   it('groups newest-first uses by local day without regrouping later days', () => {

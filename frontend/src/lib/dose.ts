@@ -3,6 +3,8 @@ export const VOLUME_DECIMALS = 6;
 export const IU_DECIMALS = 1;
 export const CONCENTRATION_WARN_LOW = 0.5;
 export const CONCENTRATION_WARN_HIGH = 20;
+export const FALLBACK_SYRINGE_VOLUME_ML = 0.5;
+export const FALLBACK_SYRINGE_CAPACITY_IU = 50;
 
 export type DosePreview = {
   concentration: number;

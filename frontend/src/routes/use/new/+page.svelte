@@ -6,7 +6,9 @@
     formatDoseLine,
     formatMl,
     parseIuInput,
-    previewDose
+    previewDose,
+    FALLBACK_SYRINGE_CAPACITY_IU,
+    FALLBACK_SYRINGE_VOLUME_ML
   } from '$lib/dose';
   import { nowDatetimeLocal } from '$lib/datetime';
   import { OFFLINE_SAVE_MESSAGE, saveWhileOnline } from '$lib/offline';
@@ -34,10 +36,16 @@
   let iuError = $state('');
 
   const iu = $derived(parseIuInput(iuText));
-  const syringe = $derived(syringes.find((item) => item.id === syringeId) ?? syringes[0] ?? null);
+  const syringe = $derived(syringes.find((item) => item.id === syringeId) ?? null);
   const preview = $derived(
-    current && syringe && iu !== null
-      ? previewDose(iu, current.peptide_mg, current.bac_water_ml, syringe.volume_ml, syringe.capacity_iu)
+    current && iu !== null
+      ? previewDose(
+          iu,
+          current.peptide_mg,
+          current.bac_water_ml,
+          syringe?.volume_ml ?? FALLBACK_SYRINGE_VOLUME_ML,
+          syringe?.capacity_iu ?? FALLBACK_SYRINGE_CAPACITY_IU
+        )
       : null
   );
 
@@ -66,7 +74,7 @@
       const result = await saveWhileOnline(() =>
         logUse({
           iu,
-          syringe_id: syringeId || undefined,
+          syringe_id: syringeId === '' ? null : syringeId,
           used_at: usedAt,
           notes: notes === '' ? null : notes
         })
@@ -113,12 +121,13 @@
     <label>
       Syringe
       <select bind:value={syringeId}>
+        <option value="">None</option>
         {#each syringes as item (item.id)}
           <option value={item.id}>{item.label} · {item.quantity} left</option>
         {/each}
       </select>
       {#if syringe && syringe.quantity < 1}
-        <span class="field-error">Restock this syringe type in Inventory before logging.</span>
+        <span class="muted">No syringes of this type on hand — logging still works.</span>
       {/if}
       {#if firstFieldError(fields, 'syringe_id')}
         <span class="field-error">{firstFieldError(fields, 'syringe_id')}</span>

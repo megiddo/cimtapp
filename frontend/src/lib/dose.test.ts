@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FALLBACK_SYRINGE_CAPACITY_IU,
+  FALLBACK_SYRINGE_VOLUME_ML,
   concentration,
   concentrationFromUse,
   exceedsRemainder,
@@ -130,6 +132,8 @@ describe('dose formulas', () => {
   it('builds auto syringe labels without trailing zeros', () => {
     expect(syringeLabel(0.5, 50)).toBe('0.5 mL / 50 IU');
     expect(syringeLabel(1, 40)).toBe('1 mL / 40 IU');
+    expect(FALLBACK_SYRINGE_VOLUME_ML).toBe(0.5);
+    expect(FALLBACK_SYRINGE_CAPACITY_IU).toBe(50);
     expect(trimNumber(1.25)).toBe('1.25');
     expect(trimNumber(0.5)).toBe('0.5');
   });

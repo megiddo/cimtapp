@@ -56,10 +56,30 @@ final class SyringeService
         );
         $row = $stmt === false ? false : $stmt->fetch(PDO::FETCH_ASSOC);
         if (!is_array($row)) {
-            throw new DomainRecordNotFoundException(DoseConfig::SYRINGE_UNKNOWN);
+            return $this->fallbackProfile();
         }
 
         return $this->map($row);
+    }
+
+    /**
+     * Snapshot used for IU math when the user logs without a syringe type.
+     *
+     * @return array<string, mixed>
+     */
+    public function fallbackProfile(): array
+    {
+        return [
+            'id' => null,
+            'label' => DoseConfig::syringeLabel(
+                DoseConfig::FALLBACK_SYRINGE_VOLUME_ML,
+                DoseConfig::FALLBACK_SYRINGE_CAPACITY_IU,
+            ),
+            'volume_ml' => DoseConfig::FALLBACK_SYRINGE_VOLUME_ML,
+            'capacity_iu' => DoseConfig::FALLBACK_SYRINGE_CAPACITY_IU,
+            'is_default' => false,
+            'quantity' => 0,
+        ];
     }
 
     /**
