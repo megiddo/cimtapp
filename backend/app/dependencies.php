@@ -26,10 +26,8 @@ use App\Domain\Dose\PeptideCatalog;
 use App\Domain\Dose\UserPeptideService;
 use App\Domain\Dose\SyringeService;
 use App\Domain\Dose\UseService;
-use App\Infrastructure\Http\FileGetContentsHttpTransport;
-use App\Infrastructure\Http\HttpGoogleOAuthClient;
-use App\Infrastructure\Http\HttpTransport;
 use App\Infrastructure\Http\SessionCookie;
+use App\Infrastructure\OAuth\LeagueGoogleOAuthClient;
 use App\Infrastructure\Persistence\DataPaths;
 use App\Infrastructure\Persistence\GlobalConnection;
 use App\Infrastructure\Persistence\GlobalMigrator;
@@ -148,15 +146,13 @@ return function (ContainerBuilder $containerBuilder): void {
 
             return new SessionCookie((bool) $settings->get('sessionSecure'));
         },
-        HttpTransport::class => static fn (): HttpTransport => new FileGetContentsHttpTransport(),
         GoogleOAuthClient::class => static function (ContainerInterface $c): GoogleOAuthClient {
             $settings = $c->get(SettingsInterface::class);
 
-            return new HttpGoogleOAuthClient(
+            return LeagueGoogleOAuthClient::fromCredentials(
                 (string) $settings->get('googleClientId'),
                 (string) $settings->get('googleClientSecret'),
                 (string) $settings->get('googleRedirectUri'),
-                $c->get(HttpTransport::class),
             );
         },
         UserProvisioner::class => static function (ContainerInterface $c): UserProvisioner {

@@ -13,7 +13,7 @@ Condensed from the design canvas so later agents do not need it. Product: a pers
 | User store | `data/users/{uuid}.sqlite.enc` | Compounds, uses, syringe profiles, identity snapshot. Locked per request. |
 | Crypto | libsodium secretbox + secretstream | `App\Domain\Crypto\Crypto`. Stock PHP (`ext-sodium`). No SQLCipher. |
 | Plaintext tmp | `DATA_DIR/tmp` | Decrypted user sqlite while a request holds the flock. Docker mounts tmpfs at `/var/www/cimtapp/data/tmp`. Host `./data` is bind-mounted in both `docker-compose.yml` (dev) and `docker-compose.prod.yml` (prod) so ciphertext survives rebuilds. |
-| OAuth | Google authorization code | Server exchanges the code. Never put the client secret in the SPA. |
+| OAuth | `league/oauth2-google` | Authorization code + PKCE (S256). Server exchanges the code. Never put the client secret in the SPA. |
 
 PHP front controller matches the Slim skeleton: PHP-DI `ContainerBuilder`, `app/settings.php` + `dependencies.php` + `repositories.php`, `AppFactory::setContainer`, middleware + routes, `ServerRequestCreatorFactory`, `HttpErrorHandler`, `ShutdownHandler`, routing/body/error middleware, `ResponseEmitter`.
 
@@ -60,7 +60,7 @@ Request unlock path for protected routes (`/me`, later domain):
 
 `UserStoreLockedException` → HTTP **503** `{ type: SERVICE_UNAVAILABLE }`. `CryptoException` → **500** with a generic description (never keys). Missing/invalid session → **401**.
 
-Google HTTP is mocked in tests via `GoogleOAuthClient` (fake implementation). The SPA never sees `GOOGLE_CLIENT_SECRET`. `GET /auth/google/start` returns **503** if Google is not configured.
+Google is `league/oauth2-google` behind `GoogleOAuthClient` (fake in tests; Guzzle mock for the League adapter). The SPA never sees `GOOGLE_CLIENT_SECRET`. `GET /auth/google/start` returns **503** if Google is not configured.
 
 Each user sqlite includes an `account` snapshot (email, password hash, google_sub) and one default syringe **0.5 mL / 50 IU** (`is_default = 1`). Ciphertext path: `{DATA_DIR}/users/{uuid}.sqlite.enc`.
 
