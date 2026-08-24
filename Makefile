@@ -3,7 +3,7 @@ COMPOSE_PROD ?= $(COMPOSE) -f docker-compose.prod.yml
 APP = $(COMPOSE) run --rm --no-deps app
 FRONTEND = $(COMPOSE) run --rm frontend
 
-.PHONY: setup up up-prod down down-prod build test test-php test-js infection mutation coverage frontend-build logs
+.PHONY: setup up up-prod down down-prod build deploy test test-php test-js infection mutation coverage frontend-build logs
 
 setup:
 	@test -f .env || cp .env.example .env
@@ -24,6 +24,9 @@ down-prod:
 
 build:
 	$(COMPOSE) build
+
+deploy:
+	./scripts/deploy.sh
 
 test: test-php test-js
 
