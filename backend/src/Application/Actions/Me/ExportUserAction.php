@@ -37,7 +37,7 @@ final class ExportUserAction extends Action
 
         return $this->response
             ->withHeader('Content-Type', 'application/octet-stream')
-            ->withHeader('Content-Disposition', 'attachment; filename="pepcalc-export.sqlite"')
+            ->withHeader('Content-Disposition', 'attachment; filename="peptrack-export.sqlite"')
             ->withHeader('Cache-Control', 'no-store')
             ->withStatus(200);
     }

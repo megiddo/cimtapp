@@ -79,7 +79,7 @@ export function titleForPath(pathname: string): string {
     return 'Settings';
   }
 
-  return 'PepCalc';
+  return 'PepTrack';
 }
 
 export function backHrefForPath(pathname: string): string | null {

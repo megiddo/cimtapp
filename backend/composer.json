@@ -1,6 +1,6 @@
 {
     "name": "megiddo/cimtapp",
-    "description": "PepCalc — personal compounding log (Slim 4 API)",
+    "description": "PepTrack — personal compounding log (Slim 4 API)",
     "license": "MIT",
     "type": "project",
     "require": {

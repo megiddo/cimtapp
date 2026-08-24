@@ -1,6 +1,6 @@
 # Backup and AMK rotation
 
-PepCalc encrypts each user sqlite with a per-user DEK, then wraps that DEK with the application master key (AMK) `CIMT_MASTER_KEY`. A backup that omits the AMK cannot be restored.
+PepTrack encrypts each user sqlite with a per-user DEK, then wraps that DEK with the application master key (AMK) `CIMT_MASTER_KEY`. A backup that omits the AMK cannot be restored.
 
 ## Backup unit
 
@@ -23,7 +23,7 @@ If the AMK does not match, user files will not decrypt (HTTP 500 with a generic 
 
 ## Decrypt-to-sqlite export (logged-in user)
 
-`GET /api/v1/me/export` (cookie session) returns `application/octet-stream` — the caller’s plaintext sqlite (`pepcalc-export.sqlite`). Settings also exposes **Download sqlite** for the signed-in user. This is the **exfil unit**: it includes the account snapshot, syringes, compounds, and uses.
+`GET /api/v1/me/export` (cookie session) returns `application/octet-stream` — the caller’s plaintext sqlite (`peptrack-export.sqlite`). Settings also exposes **Download sqlite** for the signed-in user. This is the **exfil unit**: it includes the account snapshot, syringes, compounds, and uses.
 
 The handler decrypts under the user lock, streams the bytes, and shreds the temp file before the response finishes. Plaintext is not left on disk after the response. Do not commit or copy that download into `DATA_DIR`.
 

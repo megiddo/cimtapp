@@ -1,4 +1,4 @@
-# PepCalc design (in-repo)
+# PepTrack design (in-repo)
 
 Condensed from the design canvas so later agents do not need it. Product: a personal compounding log for incretin mimetics.
 
