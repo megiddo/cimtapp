@@ -141,7 +141,7 @@ final class AuthService
     /**
      * Identity snapshot from the unlocked user sqlite (not global DEK columns).
      *
-     * @return array{email: string, has_password: bool, has_google: bool, remainder: null}
+     * @return array{email: string, has_password: bool, has_google: bool, remainder: null, open_vials: list<empty>}
      */
     public function meFromUserDb(PDO $pdo): array
     {
@@ -162,6 +162,7 @@ final class AuthService
             'has_password' => is_string($passwordHash) && $passwordHash !== '',
             'has_google' => is_string($googleSub) && $googleSub !== '',
             'remainder' => null,
+            'open_vials' => [],
         ];
     }
 

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  defaultOpenVialId,
   defaultSyringeId,
   deleteCompound,
   deleteBacBottle,
@@ -9,6 +10,7 @@ import {
   fetchCompounds,
   fetchCurrentBacBottle,
   fetchCurrentCompound,
+  fetchOpenCompounds,
   fetchPeptideTypes,
   fetchSyringe,
   fetchSyringes,
@@ -28,6 +30,7 @@ import {
   parseCountInput,
   remainingIuFrom,
   restockSyringe,
+  vialLabel,
   burnSyringe,
   burnBacBottle
 } from './inventory';
@@ -64,6 +67,25 @@ describe('inventory API client', () => {
     await expect(fetchCompounds()).resolves.toEqual([]);
     await expect(fetchCurrentCompound()).resolves.toBeNull();
     await expect(fetchCurrentCompound()).resolves.toBeNull();
+  });
+
+  it('lists open vials', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse(200, {
+            statusCode: 200,
+            data: [{ id: 'c1', name: 'Fridge A', is_open: true, peptide_type_name: 'Tirzepatide' }]
+          })
+        )
+        .mockResolvedValueOnce(jsonResponse(200, { statusCode: 200 }))
+    );
+    await expect(fetchOpenCompounds()).resolves.toEqual([
+      { id: 'c1', name: 'Fridge A', is_open: true, peptide_type_name: 'Tirzepatide' }
+    ]);
+    await expect(fetchOpenCompounds()).resolves.toEqual([]);
   });
 
   it('builds use list query strings and maps 404 use', async () => {
@@ -113,6 +135,7 @@ describe('inventory API client', () => {
     await expect(
       mixCompound({
         peptide_type_id: 'tirzepatide',
+        name: 'Fridge A',
         peptide_mg: 10,
         bac_water_ml: 2,
         compounded_at: '2026-08-20T12:00'
@@ -160,6 +183,18 @@ describe('inventory API client', () => {
     expect(
       defaultSyringeId([{ id: 'z', label: 'Z', volume_ml: 1, capacity_iu: 1, is_default: false, quantity: 0 }], null)
     ).toBe('z');
+  });
+
+  it('labels vials by name and peptide and picks an open vial', () => {
+    expect(vialLabel({ name: 'Tirzepatide', peptide_type_name: 'Tirzepatide' })).toBe('Tirzepatide');
+    expect(vialLabel({ name: 'Fridge A', peptide_type_name: 'Tirzepatide' })).toBe('Fridge A · Tirzepatide');
+    const vials = [
+      { id: 'a', name: 'A', peptide_type_name: 'Tirzepatide' },
+      { id: 'b', name: 'B', peptide_type_name: 'Semaglutide' }
+    ] as const;
+    expect(defaultOpenVialId([...vials], 'b')).toBe('b');
+    expect(defaultOpenVialId([...vials], 'missing')).toBe('a');
+    expect(defaultOpenVialId([], null)).toBe('');
   });
 
   it('reads remaining_iu only when finite', () => {
@@ -277,7 +312,7 @@ describe('inventory API client', () => {
         jsonResponse(200, { statusCode: 200, data: { id: 'c1', peptide_mg: 12, notes: 'fixed' } })
       )
     );
-    await expect(patchCompound('c1', { peptide_mg: 12, notes: 'fixed' })).resolves.toMatchObject({
+    await expect(patchCompound('c1', { peptide_mg: 12, notes: 'fixed', name: 'Fridge A', is_open: false })).resolves.toMatchObject({
       ok: true,
       status: 200
     });

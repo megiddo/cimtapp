@@ -43,7 +43,7 @@ class AmkRotatorTest extends TestCase
         $paths = new DataPaths($this->dir);
         (new GlobalMigrator($paths, dirname(__DIR__, 3) . '/migrations/global'))->migrate();
         $users = new SqliteUserRepository(new GlobalConnection($paths));
-        $store = new UserStore($old, new UserMigrator(dirname(__DIR__, 3) . '/migrations/user'), $paths);
+        $store = new UserStore($old, new UserMigrator(), $paths);
 
         $dek = $old->mintDek();
         $wrapped = $old->wrapDek($dek);

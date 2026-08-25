@@ -32,7 +32,7 @@ final class UseService
 
         if ($before === null) {
             $stmt = $pdo->prepare(
-                'SELECT uses.*, compounds.peptide_type_name
+                'SELECT uses.*, compounds.peptide_type_name, compounds.name AS compound_name
                  FROM uses
                  JOIN compounds ON compounds.id = uses.compound_id
                  ORDER BY uses.used_at DESC, uses.id DESC
@@ -42,7 +42,7 @@ final class UseService
             $stmt->execute();
         } else {
             $stmt = $pdo->prepare(
-                'SELECT uses.*, compounds.peptide_type_name
+                'SELECT uses.*, compounds.peptide_type_name, compounds.name AS compound_name
                  FROM uses
                  JOIN compounds ON compounds.id = uses.compound_id
                  WHERE uses.used_at < :before
@@ -65,7 +65,7 @@ final class UseService
     public function get(PDO $pdo, string $id): array
     {
         $stmt = $pdo->prepare(
-            'SELECT uses.*, compounds.peptide_type_name
+            'SELECT uses.*, compounds.peptide_type_name, compounds.name AS compound_name
              FROM uses
              JOIN compounds ON compounds.id = uses.compound_id
              WHERE uses.id = :id'
@@ -323,6 +323,7 @@ final class UseService
             'id' => (string) $row['id'],
             'compound_id' => (string) $row['compound_id'],
             'peptide_type_name' => (string) $row['peptide_type_name'],
+            'compound_name' => (string) $row['compound_name'],
             'iu' => (float) $row['iu'],
             'syringe_id' => $row['syringe_id'] === null ? null : (string) $row['syringe_id'],
             'syringe_label' => $row['syringe_label'] === null ? null : (string) $row['syringe_label'],

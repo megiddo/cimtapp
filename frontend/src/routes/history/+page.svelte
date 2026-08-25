@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { formatDoseLine } from '$lib/dose';
   import { formatTime, groupUsesByLocalDay } from '$lib/history';
-  import { fetchUses, type LoggedUse } from '$lib/inventory';
+  import { fetchUses, vialLabel, type LoggedUse } from '$lib/inventory';
 
   let uses = $state<LoggedUse[]>([]);
   let loaded = $state(false);
@@ -29,7 +29,7 @@
         <a class="row" href="/history/{use.id}">
           <span>
             <span class="primary">{formatTime(use.used_at)} · {formatDoseLine(use.iu, use.peptide_mg)}</span>
-            <div class="secondary">{use.peptide_type_name} · {use.syringe_label ?? ''}</div>
+            <div class="secondary">{vialLabel({ name: use.compound_name, peptide_type_name: use.peptide_type_name })} · {use.syringe_label ?? ''}</div>
           </span>
         </a>
       {/each}

@@ -18,6 +18,8 @@
   let compound = $state<Compound | null>(null);
   let peptides = $state<PeptideType[]>([]);
   let peptideTypeId = $state('');
+  let vialName = $state('');
+  let openState = $state('1');
   let peptideMg = $state('');
   let bacWaterMl = $state('');
   let compoundedAt = $state('');
@@ -43,6 +45,8 @@
     compound = await fetchCompound(id);
     if (compound !== null) {
       peptideTypeId = compound.peptide_type_id;
+      vialName = compound.name;
+      openState = compound.is_open ? '1' : '0';
       peptideMg = String(compound.peptide_mg);
       bacWaterMl = String(compound.bac_water_ml);
       notes = compound.notes ?? '';
@@ -76,6 +80,8 @@
       const result = await saveWhileOnline(() =>
         patchCompound(target.id, {
           peptide_type_id: peptideTypeId,
+          name: vialName.trim(),
+          is_open: openState === '1',
           peptide_mg: mg,
           bac_water_ml: bac,
           compounded_at: compoundedAt,
@@ -149,6 +155,25 @@
     <a class="chip" href="/inventory/peptides/new?from=/inventory/{compound.id}">Add peptide</a>
 
     <label>
+      Vial name
+      <input type="text" bind:value={vialName} maxlength="80" />
+      {#if firstFieldError(fields, 'name')}
+        <span class="field-error">{firstFieldError(fields, 'name')}</span>
+      {/if}
+    </label>
+
+    <label>
+      Status
+      <select bind:value={openState}>
+        <option value="1">Open</option>
+        <option value="0">Closed</option>
+      </select>
+      {#if firstFieldError(fields, 'is_open')}
+        <span class="field-error">{firstFieldError(fields, 'is_open')}</span>
+      {/if}
+    </label>
+
+    <label>
       Peptide mg
       <input inputmode="decimal" bind:value={peptideMg} />
       {#if firstFieldError(fields, 'peptide_mg')}
@@ -177,7 +202,7 @@
       <input type="text" bind:value={notes} />
     </label>
 
-    {#if formError && !firstFieldError(fields, 'peptide_type_id') && !firstFieldError(fields, 'peptide_mg') && !firstFieldError(fields, 'bac_water_ml')}
+    {#if formError && !firstFieldError(fields, 'peptide_type_id') && !firstFieldError(fields, 'peptide_mg') && !firstFieldError(fields, 'bac_water_ml') && !firstFieldError(fields, 'name')}
       <p class="field-error" role="alert">{formError}</p>
     {/if}
 

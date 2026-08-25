@@ -25,7 +25,9 @@ final class ViewMeAction extends AuthenticatedAction
     protected function action(): Response
     {
         $me = $this->auth->meFromUserDb($this->userPdo());
-        $me['remainder'] = $this->compounds->currentRemainder($this->userPdo());
+        $pdo = $this->userPdo();
+        $me['remainder'] = $this->compounds->currentRemainder($pdo);
+        $me['open_vials'] = $this->compounds->openRemainders($pdo);
 
         return $this->respondWithData($me);
     }

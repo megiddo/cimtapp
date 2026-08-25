@@ -29,6 +29,7 @@
   let syringes = $state<Syringe[]>([]);
   let bacBottle = $state<BacBottle | null>(null);
   let peptideTypeId = $state('');
+  let vialName = $state('');
   let peptideMg = $state('10');
   let bacWaterMl = $state('2');
   let compoundedAt = $state(nowDatetimeLocal());
@@ -77,6 +78,10 @@
       requested !== null && peptides.some((peptide) => peptide.id === requested)
         ? requested
         : (peptides[0]?.id ?? '');
+    const seededName = peptides.find((peptide) => peptide.id === peptideTypeId);
+    if (seededName !== undefined) {
+      vialName = seededName.name;
+    }
     bacBottle = await fetchCurrentBacBottle();
     const defaultId = defaultSyringeId(syringes, null);
     const seeded = syringes.find((item) => item.id === defaultId) ?? syringes[0];
@@ -87,6 +92,17 @@
     }
     loaded = true;
   });
+
+  function onPeptideChange() {
+    const selected = peptides.find((peptide) => peptide.id === peptideTypeId);
+    if (selected === undefined) {
+      return;
+    }
+    const matchesPeptide = peptides.some((peptide) => peptide.name === vialName);
+    if (vialName.trim() === '' || matchesPeptide) {
+      vialName = selected.name;
+    }
+  }
 
   function openCalc() {
     calcMg = peptideMg;
@@ -141,6 +157,7 @@
     fields = {};
     const result = await mixCompound({
       peptide_type_id: peptideTypeId,
+      name: vialName.trim() === '' ? undefined : vialName.trim(),
       peptide_mg: mg,
       bac_water_ml: bac,
       compounded_at: compoundedAt,
@@ -163,7 +180,7 @@
   <form class="auth-form" onsubmit={onSubmit}>
     <label>
       Peptide
-      <select bind:value={peptideTypeId}>
+      <select bind:value={peptideTypeId} onchange={onPeptideChange}>
         {#each peptides as peptide (peptide.id)}
           <option value={peptide.id}>{peptide.name}</option>
         {/each}
@@ -173,6 +190,14 @@
       {/if}
     </label>
     <a class="chip" href="/inventory/peptides/new">Add peptide</a>
+
+    <label>
+      Vial name
+      <input type="text" bind:value={vialName} maxlength="80" />
+      {#if firstFieldError(fields, 'name')}
+        <span class="field-error">{firstFieldError(fields, 'name')}</span>
+      {/if}
+    </label>
 
     <label>
       Peptide mg

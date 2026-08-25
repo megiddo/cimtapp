@@ -2,7 +2,7 @@
 
 Personal compounding log for peptide doses. Mix a vial, log each use in IU against a named syringe, see milligrams deducted, and watch the active vial burn down.
 
-This repository currently ships **v0.1.3**. Mix a vial, log IU, remainder, settings syringes, empty/error states, PWA Add to Home Screen, login/Google rate limits, AMK rotation, and an authenticated sqlite export. Cookie sessions and encrypted user sqlite come from Phase 1. Bump `frontend/src/lib/version.ts` on every PR — Settings and the login screen show that string.
+This repository currently ships **v0.1.5**. Mix named vials (several can stay open), log IU, remainder, settings syringes, empty/error states, PWA Add to Home Screen, login/Google rate limits, AMK rotation, and an authenticated decrypted sqlite export. Cookie sessions and encrypted user sqlite come from Phase 1. Bump `frontend/src/lib/version.ts` on every PR — Settings and the login screen show that string.
 
 ## Quick start (Docker)
 
@@ -31,7 +31,7 @@ Then open **http://localhost:26980** instead.
 
 Health: **http://localhost:24780/api/v1/health** (or the remapped host port) → `{ "status": "ok" }`
 
-Auth (same origin, cookie `cimtapp_session`): `POST /api/v1/auth/register`, `/auth/login`, `/auth/logout`; `GET /api/v1/auth/google/start` (full page); `GET /api/v1/me`. Login and Google start are limited to **10 attempts / 15 minutes** per IP (and per email for login). Domain (cookie required): `GET /peptide-types`, `/syringes`, `/compounds`, `/compounds/current` (**404** if none), `/uses`; `POST /compounds` (mix), `POST /uses` (log). `GET /api/v1/me/export` downloads the logged-in user’s plaintext sqlite. Passwords are Argon2id, minimum 12 characters. Google is mocked in tests — no real `GOOGLE_CLIENT_*` required outside production.
+Auth (same origin, cookie `cimtapp_session`): `POST /api/v1/auth/register`, `/auth/login`, `/auth/logout`; `GET /api/v1/auth/google/start` (full page); `GET /api/v1/me`. Login and Google start are limited to **10 attempts / 15 minutes** per IP (and per email for login). Domain (cookie required): `GET /peptide-types`, `/syringes`, `/compounds`, `/compounds/open`, `/compounds/current` (**404** if none open), `/uses`; `POST /compounds` (mix; optional `name`), `POST /uses` (log). `GET /api/v1/me/export` downloads the logged-in user’s **decrypted** sqlite at the current schema. Passwords are Argon2id, minimum 12 characters. Google is mocked in tests — no real `GOOGLE_CLIENT_*` required outside production.
 
 `make up` is equivalent to copying `.env` if missing and running `docker compose up --build` (**development**: bind-mounts `backend/` for PHP edits). `make up-prod` uses `docker-compose.prod.yml` (image contents only, `APP_ENV=production`, `SESSION_SECURE=true`, real `CIMT_MASTER_KEY` required in `.env`). Both bind `./data` on the host to `/var/www/cimtapp/data`, so `global.sqlite` and `users/*.enc` survive container rebuilds. Decrypted user sqlite is written only under `DATA_DIR/tmp` (tmpfs in Docker — not on the host). If you still have the old named volume `cimtapp_cimtapp-data`, copy it once: `docker run --rm -v cimtapp_cimtapp-data:/from -v "$PWD/data:/to" alpine sh -c 'cp -a /from/. /to/'`.
 
