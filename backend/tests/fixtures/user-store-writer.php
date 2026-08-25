@@ -33,7 +33,7 @@ if (!is_string($dek) || strlen($dek) !== 32) {
 
 $store = new UserStore(
     Crypto::fromMasterKey($masterKey),
-    new UserMigrator(dirname(__DIR__, 2) . '/migrations/user'),
+    new UserMigrator(),
     new DataPaths($dataDir),
     8000,
 );

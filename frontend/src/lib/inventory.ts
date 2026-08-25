@@ -29,6 +29,8 @@ export type BacBottle = {
 
 export type Compound = {
   id: string;
+  name: string;
+  is_open: boolean;
   peptide_type_id: string;
   peptide_type_slug: string;
   peptide_type_name: string;
@@ -48,6 +50,7 @@ export type Compound = {
 export type LoggedUse = {
   id: string;
   compound_id: string;
+  compound_name: string;
   peptide_type_name: string;
   iu: number;
   syringe_id: string | null;
@@ -123,6 +126,11 @@ export async function fetchSyringe(id: string, baseUrl = ''): Promise<Syringe | 
 
 export async function fetchCompounds(baseUrl = ''): Promise<Compound[]> {
   const payload = await readAction<Compound[]>('/api/v1/compounds', { baseUrl });
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
+export async function fetchOpenCompounds(baseUrl = ''): Promise<Compound[]> {
+  const payload = await readAction<Compound[]>('/api/v1/compounds/open', { baseUrl });
   return Array.isArray(payload.data) ? payload.data : [];
 }
 
@@ -250,6 +258,8 @@ export async function mixCompound(
     peptide_mg: number;
     bac_water_ml: number;
     compounded_at: string;
+    name?: string;
+    is_open?: boolean;
     notes?: string | null;
   },
   baseUrl = ''
@@ -270,6 +280,8 @@ export async function patchCompound(
     peptide_mg?: number;
     bac_water_ml?: number;
     compounded_at?: string;
+    name?: string;
+    is_open?: boolean;
     notes?: string | null;
   },
   baseUrl = ''
@@ -449,4 +461,18 @@ export function defaultSyringeId(syringes: Syringe[], lastUsedId: string | null)
   }
   const flagged = syringes.find((item) => item.is_default);
   return flagged?.id ?? syringes[0]?.id ?? '';
+}
+
+export function vialLabel(vial: { name: string; peptide_type_name: string }): string {
+  if (vial.name === vial.peptide_type_name) {
+    return vial.name;
+  }
+  return `${vial.name} · ${vial.peptide_type_name}`;
+}
+
+export function defaultOpenVialId(vials: { id: string }[], preferredId: string | null): string {
+  if (preferredId !== null && vials.some((item) => item.id === preferredId)) {
+    return preferredId;
+  }
+  return vials[0]?.id ?? '';
 }

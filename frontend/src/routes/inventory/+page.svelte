@@ -5,6 +5,7 @@
     fetchBacBottles,
     fetchCompounds,
     fetchSyringes,
+    vialLabel,
     type BacBottle,
     type Compound,
     type Syringe
@@ -51,12 +52,12 @@
       </div>
     {:else}
       <div class="cards">
-        {#each compounds as compound, index (compound.id)}
+        {#each compounds as compound (compound.id)}
           <a class="card" href="/inventory/{compound.id}">
             <div>
-              <strong>{compound.peptide_type_name}</strong>
-              {#if index === 0}
-                <span class="badge">Current</span>
+              <strong>{vialLabel(compound)}</strong>
+              {#if compound.is_open}
+                <span class="badge">Open</span>
               {/if}
             </div>
             <div>{formatMg(compound.remaining_mg)} mg · {formatMl(compound.remaining_ml)} mL remaining</div>

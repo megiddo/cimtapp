@@ -84,6 +84,7 @@ class AuthDomainTest extends TestCase
             'has_password' => true,
             'has_google' => true,
             'remainder' => null,
+            'open_vials' => [],
         ], $me);
         $this->assertArrayNotHasKey('encrypted_dek', $me);
 

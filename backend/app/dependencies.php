@@ -33,6 +33,7 @@ use App\Infrastructure\Persistence\GlobalConnection;
 use App\Infrastructure\Persistence\GlobalMigrator;
 use App\Infrastructure\Persistence\SqliteFileMigrator;
 use App\Infrastructure\Persistence\UserMigrator;
+use App\Infrastructure\Persistence\UserSchema\UserSchemaCatalog;
 use App\Infrastructure\Persistence\UserStore;
 use DI\ContainerBuilder;
 use Monolog\Handler\StreamHandler;
@@ -75,11 +76,9 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(SqliteFileMigrator::class),
             );
         },
+        UserSchemaCatalog::class => static fn (): UserSchemaCatalog => UserSchemaCatalog::default(),
         UserMigrator::class => static function (ContainerInterface $c): UserMigrator {
-            return new UserMigrator(
-                dirname(__DIR__) . '/migrations/user',
-                $c->get(SqliteFileMigrator::class),
-            );
+            return new UserMigrator($c->get(UserSchemaCatalog::class));
         },
         UserStore::class => static function (ContainerInterface $c): UserStore {
             return new UserStore(

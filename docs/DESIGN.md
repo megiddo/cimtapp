@@ -33,7 +33,7 @@ Request unlock path: session cookie → user row + encrypted DEK → unwrap DEK 
 
 Boot (`App\Application\Boot\BootServices`): `GlobalMigrator` applies `backend/migrations/global/*.sql` onto `{DATA_DIR}/global.sqlite` (creates the dir if missing). Second boot is a no-op via `schema_migrations`. Peptide seed is `INSERT OR IGNORE`.
 
-Open a user store (Phase 1 will call this from auth middleware): inject `App\Infrastructure\Persistence\UserStore`, unwrap the DEK with `Crypto`, then `UserStore::withUnlocked($userId, $dek, function (PDO $pdo) { ... })`. `create($userId, $dek)` applies `backend/migrations/user/*.sql` to a fresh sqlite, encrypts, and writes `{DATA_DIR}/users/{uuid}.sqlite.enc`. Lock timeout throws `UserStoreLockedException` (map to HTTP 503 in Phase 1). Plaintext files live only under `{DATA_DIR}/tmp/` for the duration of the callback.
+Open a user store: inject `App\Infrastructure\Persistence\UserStore`, unwrap the DEK with `Crypto`, then `UserStore::withUnlocked($userId, $dek, function (PDO $pdo) { ... })`. `create($userId, $dek)` applies user-schema **strategies** (`App\Infrastructure\Persistence\UserSchema`) to a fresh sqlite up to `UserStoreFormat::current()`, encrypts, and writes `{DATA_DIR}/users/{uuid}.sqlite.enc`. Unlock and `GET /me/export` detect prior format versions (`user_store_format`, legacy `schema_migrations` filenames, or table shape) and mutate forward. Export returns decrypted plaintext sqlite (`SQLite format 3`) after those mutations. Lock timeout throws `UserStoreLockedException` (HTTP 503). Plaintext files live only under `{DATA_DIR}/tmp/` for the duration of the callback.
 
 Future (not v1): wrap DEK with Argon2id from the user password for password-only zero-knowledge. Google accounts cannot use that model without a recovery secret.
 
@@ -78,10 +78,11 @@ Each user sqlite includes an `account` snapshot (email, password hash, google_su
 
 - `account` (1 row): user_id, email, password_hash, google_sub, updated_at
 - `syringe_profiles`: id, label, volume_ml > 0, capacity_iu > 0, is_default (exactly one)
-- `compounds`: id, peptide_type_id + slug/name, peptide_mg, bac_water_ml, compounded_at, notes, created_at
+- `compounds`: id, **name** (vial identifier), **is_open**, peptide_type_id + slug/name, peptide_mg, bac_water_ml, compounded_at, notes, created_at
 - `uses`: id, compound_id, iu, syringe snapshots, volume_ml, peptide_mg, used_at, notes, created_at/updated_at
+- `user_store_format`: single-row integer format version (strategy migrations)
 
-Active compound = latest `compounded_at`. Remainder UI always means that row. Compounds stay editable after uses; changing `peptide_mg` or `bac_water_ml` recalculates stored use milligrams. Delete is allowed only when the vial has no uses.
+Open vials (`is_open = 1`) can coexist. Home and Log list them by **name + peptide**. `GET /compounds/current` is the latest **open** `compounded_at`. Closed vials stay in inventory. Compounds stay editable after uses; changing `peptide_mg` or `bac_water_ml` recalculates stored use milligrams. Delete is allowed only when the vial has no uses.
 
 ## API (`/api/v1`, JSON, cookie auth)
 
@@ -101,21 +102,23 @@ Validation errors: **422** with a field map on `error.fields`. Unauthenticated: 
 }
 ```
 
-Success bodies stay `{ "statusCode": 201, "data": { ... } }`. `GET /me` data is `{ email, has_password, has_google, remainder }`. `remainder` is `null` until a vial exists, then:
+Success bodies stay `{ "statusCode": 201, "data": { ... } }`. `GET /me` data is `{ email, has_password, has_google, remainder, open_vials }`. `remainder` is `null` until an **open** vial exists, then:
 
 ```json
 {
   "compound_id": "…",
+  "name": "Fridge A",
   "peptide_name": "Tirzepatide",
   "remaining_mg": 8.75,
   "remaining_ml": 1.75,
   "remaining_iu": 175,
   "concentration": 5,
-  "compounded_at": "2026-08-20T12:00"
+  "compounded_at": "2026-08-20T12:00",
+  "is_open": true
 }
 ```
 
-`remaining_iu` on `/me` and `GET /compounds/current` uses the **default syringe**. DEK / nonce / ciphertext never appear.
+`open_vials` is the same shape, one object per open vial (newest mix first). `remaining_iu` on `/me` and `GET /compounds/current` uses the **default syringe**. DEK / nonce / ciphertext never appear.
 
 | Method | Path | Role |
 | --- | --- | --- |
@@ -127,14 +130,15 @@ Success bodies stay `{ "statusCode": 201, "data": { ... } }`. `GET /me` data is 
 | GET | `/auth/google/callback` | exchange code, set cookie, 302 to `/` |
 | GET | `/me` | identity + remainder summary (auth) |
 | POST | `/me/password` | set or change password (auth) |
-| GET | `/me/export` | authenticated plaintext sqlite download (`application/octet-stream`); temp file shredded |
+| GET | `/me/export` | authenticated **decrypted** sqlite download (`application/octet-stream`); schema mutated to current format; temp file shredded |
 | GET | `/peptide-types` | global catalog, active only, `sort_order` (`id` = slug) |
 | GET/POST | `/syringes` | list / create (`volume_ml` > 0, `capacity_iu` > 0; auto label `0.5 mL / 50 IU` if omitted; exactly one `is_default`) |
 | PATCH | `/syringes/{id}` | label and/or default flag (setting default unsets others) |
-| GET/POST | `/compounds` | inventory (`compounded_at DESC`, includes remaining) / mix |
-| GET | `/compounds/current` | latest `compounded_at` + remainder at default syringe. **404** when no vial (SPA treats empty) |
+| GET/POST | `/compounds` | inventory (`compounded_at DESC`, includes remaining, name, is_open) / mix (`name` optional, defaults to peptide) |
+| GET | `/compounds/open` | open vials only, newest mix first |
+| GET | `/compounds/current` | latest **open** `compounded_at` + remainder at default syringe. **404** when none (SPA treats empty) |
 | GET | `/compounds/{id}` | one mix + remainder |
-| PATCH | `/compounds/{id}` | always; mix changes recalc use mg and 422 if uses would overdraw |
+| PATCH | `/compounds/{id}` | name, is_open, mix fields; mix changes recalc use mg and 422 if uses would overdraw |
 | DELETE | `/compounds/{id}` | 204 if unused; 422 if the vial has uses |
 | GET/POST | `/uses` | list `used_at DESC, id DESC` / log against current (or `compound_id`) |
 | PATCH | `/uses/{id}` | iu, syringe, used_at, notes; recalc mg; re-check remainder (original use put back first) |
@@ -176,7 +180,7 @@ remaining_iu  = remaining_ml / (syringe_volume_ml / syringe_capacity_iu)
 
 Worked example: tirzepatide 10 mg in 2.0 mL BAC, syringe 0.5 mL / 50 IU, dose 25 IU → 5.00 mg/mL, 0.010 mL/IU, 0.25 mL, 1.25 mg, remainder 8.75 mg / 1.75 mL / 175 IU.
 
-Rules: IU allows one decimal, reject `<= 0`. Store mg at 4 decimal places; display 2–3. Overdraw → 422 with `error.remaining_iu` plus `error.fields.iu`. When **editing** a use, remainder check excludes that use’s `peptide_mg` (puts it back) before applying the new IU. No compound yet → log use 422 pointing at mix-a-vial. Active compound = latest `compounded_at`, not `created_at`. After any uses, `peptide_mg` and `bac_water_ml` (and type) cannot change.
+Rules: IU allows one decimal, reject `<= 0`. Store mg at 4 decimal places; display 2–3. Overdraw → 422 with `error.remaining_iu` plus `error.fields.iu`. When **editing** a use, remainder check excludes that use’s `peptide_mg` (puts it back) before applying the new IU. No open vial yet → log use 422 pointing at mix-a-vial. Current compound = latest **open** `compounded_at`, not `created_at`. After any uses, `peptide_mg` and `bac_water_ml` (and type) cannot change.
 
 ## Mobile-first UI
 

@@ -44,6 +44,10 @@ final class DoseConfig
 
     public const PEPTIDE_NAME_TOO_LONG = 'Use a name of 80 characters or fewer.';
 
+    public const VIAL_NAME_MAX = 80;
+
+    public const VIAL_NAME_TOO_LONG = 'Use a name of 80 characters or fewer.';
+
     public const NO_COMPOUND = 'Mix a vial before logging a use.';
 
     public const COMPOUND_UNKNOWN = 'Compound not found.';

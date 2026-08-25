@@ -31,7 +31,7 @@ final class User
     /**
      * Identity for GET /me. Never includes DEK material.
      *
-     * @return array{email: string, has_password: bool, has_google: bool, remainder: null}
+     * @return array{email: string, has_password: bool, has_google: bool, remainder: null, open_vials: list<empty>}
      */
     public function toMeArray(): array
     {
@@ -40,6 +40,7 @@ final class User
             'has_password' => $this->hasPassword(),
             'has_google' => $this->hasGoogle(),
             'remainder' => null,
+            'open_vials' => [],
         ];
     }
 }

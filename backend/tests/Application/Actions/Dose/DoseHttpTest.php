@@ -80,6 +80,8 @@ class DoseHttpTest extends TestCase
         $this->assertSame(201, $mixed->getStatusCode());
         $compound = $this->json($mixed)['data'];
         $this->assertSame('Tirzepatide', $compound['peptide_type_name']);
+        $this->assertSame('Tirzepatide', $compound['name']);
+        $this->assertTrue($compound['is_open']);
         $this->assertSame('tirzepatide', $compound['peptide_type_slug']);
         $this->assertEqualsWithDelta(5.0, $compound['concentration'], 1e-9);
         $this->assertEqualsWithDelta(10.0, $compound['remaining_mg'], 1e-9);
@@ -93,7 +95,11 @@ class DoseHttpTest extends TestCase
         $meAfter = $this->json($this->authed($app, 'GET', '/api/v1/me', $sid))['data']['remainder'];
         $this->assertSame($compound['id'], $meAfter['compound_id']);
         $this->assertSame('Tirzepatide', $meAfter['peptide_name']);
+        $this->assertSame('Tirzepatide', $meAfter['name']);
         $this->assertEqualsWithDelta(10.0, $meAfter['remaining_mg'], 1e-9);
+        $open = $this->json($this->authed($app, 'GET', '/api/v1/me', $sid))['data']['open_vials'];
+        $this->assertCount(1, $open);
+        $this->assertSame($compound['id'], $open[0]['compound_id']);
     }
 
     public function testCurrentIsLatestCompoundedAtNotCreatedAt(): void
@@ -117,6 +123,112 @@ class DoseHttpTest extends TestCase
             ['2026-08-20T10:00', '2026-08-19T10:00', '2026-08-18T10:00'],
             array_map(static fn (array $row): string => $row['compounded_at'], $list)
         );
+    }
+
+    public function testMultipleOpenVialsHaveNamesAndCanBeClosed(): void
+    {
+        $app = $this->getAppInstance();
+        $sid = $this->register($app);
+        $this->ensureBac($app, $sid, 6.0);
+
+        $fridge = $this->json($this->authedJson($app, 'POST', '/api/v1/compounds', [
+            'peptide_type_id' => 'tirzepatide',
+            'name' => 'Fridge A',
+            'peptide_mg' => 10.0,
+            'bac_water_ml' => 2.0,
+            'compounded_at' => '2026-08-18T10:00',
+        ], $sid))['data'];
+        $this->assertSame(201, $this->mixTirzepatide($app, $sid, '2026-08-19T10:00')->getStatusCode());
+        $sema = $this->json($this->authedJson($app, 'POST', '/api/v1/compounds', [
+            'peptide_type_id' => 'semaglutide',
+            'name' => 'Travel',
+            'peptide_mg' => 5.0,
+            'bac_water_ml' => 1.0,
+            'compounded_at' => '2026-08-20T10:00',
+        ], $sid))['data'];
+
+        $this->assertSame('Fridge A', $fridge['name']);
+        $this->assertTrue($fridge['is_open']);
+        $this->assertSame('Travel', $sema['name']);
+        $this->assertSame('Semaglutide', $sema['peptide_type_name']);
+
+        $open = $this->json($this->authed($app, 'GET', '/api/v1/compounds/open', $sid))['data'];
+        $this->assertCount(3, $open);
+        $this->assertSame(['Travel', 'Tirzepatide', 'Fridge A'], array_map(
+            static fn (array $row): string => $row['name'],
+            $open,
+        ));
+
+        $me = $this->json($this->authed($app, 'GET', '/api/v1/me', $sid))['data'];
+        $this->assertCount(3, $me['open_vials']);
+        $this->assertSame($sema['id'], $me['remainder']['compound_id']);
+        $this->assertSame('Travel', $me['remainder']['name']);
+
+        $logged = $this->json($this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 10,
+            'compound_id' => $fridge['id'],
+            'used_at' => '2026-08-18T12:00',
+        ], $sid))['data'];
+        $this->assertSame($fridge['id'], $logged['compound_id']);
+        $this->assertSame('Fridge A', $logged['compound_name']);
+
+        $blankName = $this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $fridge['id'], [
+            'name' => '  ',
+        ], $sid);
+        $this->assertSame(422, $blankName->getStatusCode());
+        $this->assertSame(['name' => [DoseConfig::MUST_BE_TEXT]], $this->json($blankName)['error']['fields']);
+
+        $tooLong = $this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $fridge['id'], [
+            'name' => str_repeat('x', 81),
+        ], $sid);
+        $this->assertSame(422, $tooLong->getStatusCode());
+        $this->assertSame(['name' => [DoseConfig::VIAL_NAME_TOO_LONG]], $this->json($tooLong)['error']['fields']);
+
+        $closed = $this->json($this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $sema['id'], [
+            'is_open' => false,
+        ], $sid))['data'];
+        $this->assertFalse($closed['is_open']);
+
+        $stillOpen = $this->json($this->authed($app, 'GET', '/api/v1/compounds/open', $sid))['data'];
+        $this->assertCount(2, $stillOpen);
+        $current = $this->json($this->authed($app, 'GET', '/api/v1/compounds/current', $sid))['data'];
+        $this->assertNotSame($sema['id'], $current['id']);
+        $this->assertTrue($current['is_open']);
+
+        $nullOpen = $this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $fridge['id'], [
+            'is_open' => null,
+        ], $sid);
+        $this->assertSame(422, $nullOpen->getStatusCode());
+        $this->assertSame(['is_open' => [DoseConfig::MUST_BE_BOOLEAN]], $this->json($nullOpen)['error']['fields']);
+
+        $reopened = $this->json($this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $sema['id'], [
+            'is_open' => true,
+            'name' => 'Travel kit',
+        ], $sid))['data'];
+        $this->assertTrue($reopened['is_open']);
+        $this->assertSame('Travel kit', $reopened['name']);
+
+        $blankCreate = $this->authedJson($app, 'POST', '/api/v1/compounds', [
+            'peptide_type_id' => 'liraglutide',
+            'name' => '  ',
+            'peptide_mg' => 5.0,
+            'bac_water_ml' => 1.0,
+            'compounded_at' => '2026-08-21T10:00',
+        ], $sid);
+        $this->assertSame(422, $blankCreate->getStatusCode());
+        $this->assertSame(['name' => [DoseConfig::MUST_BE_TEXT]], $this->json($blankCreate)['error']['fields']);
+
+        $closedMix = $this->json($this->authedJson($app, 'POST', '/api/v1/compounds', [
+            'peptide_type_id' => 'liraglutide',
+            'name' => 'Archive',
+            'is_open' => false,
+            'peptide_mg' => 5.0,
+            'bac_water_ml' => 1.0,
+            'compounded_at' => '2026-08-21T10:00',
+        ], $sid))['data'];
+        $this->assertFalse($closedMix['is_open']);
+        $this->assertSame('Archive', $closedMix['name']);
+        $this->assertCount(3, $this->json($this->authed($app, 'GET', '/api/v1/compounds/open', $sid))['data']);
     }
 
     public function testLogUseWorkedExampleOverdrawBoundaryAndEditRemainder(): void

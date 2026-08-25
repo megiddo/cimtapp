@@ -17,6 +17,7 @@ export type Me = {
   has_password: boolean;
   has_google: boolean;
   remainder: null | unknown;
+  open_vials?: unknown[];
 };
 
 export type AuthResult =

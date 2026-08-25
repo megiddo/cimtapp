@@ -40,6 +40,8 @@ class ExportUserActionTest extends TestCase
         $pdo = new PDO('sqlite:' . $path);
         $email = (string) $pdo->query('SELECT email FROM account')->fetchColumn();
         $this->assertSame('export@example.com', $email);
+        $this->assertNotFalse($pdo->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'user_store_format'")->fetchColumn());
+        $this->assertSame(4, (int) $pdo->query('SELECT version FROM user_store_format WHERE id = 1')->fetchColumn());
         $this->removeDir($tmp);
 
         $dataDir = $this->isolateDataDir();

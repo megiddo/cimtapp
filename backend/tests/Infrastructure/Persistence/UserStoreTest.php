@@ -8,6 +8,8 @@ use App\Domain\Crypto\Crypto;
 use App\Domain\Crypto\CryptoException;
 use App\Infrastructure\Persistence\DataPaths;
 use App\Infrastructure\Persistence\UserMigrator;
+use App\Infrastructure\Persistence\UserSchema\UserSchemaCatalog;
+use App\Infrastructure\Persistence\UserSchema\UserStoreFormat;
 use App\Infrastructure\Persistence\UserStore;
 use App\Infrastructure\Persistence\UserStoreException;
 use App\Infrastructure\Persistence\UserStoreLockedException;
@@ -48,24 +50,31 @@ class UserStoreTest extends TestCase
         $this->assertSame([], glob($this->dir . '/tmp/*.sqlite') ?: []);
 
         $this->store->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
-            foreach (['account', 'syringe_profiles', 'compounds', 'uses', 'bac_bottles', 'user_peptide_types'] as $table) {
+            foreach (['account', 'syringe_profiles', 'compounds', 'uses', 'bac_bottles', 'user_peptide_types', 'user_store_format'] as $table) {
                 $stmt = $pdo->prepare(
                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name"
                 );
                 $stmt->execute([':name' => $table]);
                 $this->assertNotFalse($stmt->fetchColumn(), $table . ' missing');
             }
+            $version = (int) $pdo->query('SELECT version FROM user_store_format WHERE id = 1')->fetchColumn();
+            $this->assertSame(UserStoreFormat::current()->value, $version);
+            $names = array_map(
+                static fn (array $col): string => (string) $col['name'],
+                $pdo->query('PRAGMA table_info(compounds)')->fetchAll(PDO::FETCH_ASSOC) ?: [],
+            );
+            $this->assertContains('name', $names);
+            $this->assertContains('is_open', $names);
         });
     }
 
     public function testUnlockAppliesPendingUserMigrations(): void
     {
-        $only001 = $this->makeTempDir('cimtapp-mig-');
-        $this->assertTrue(copy(
-            dirname(__DIR__, 3) . '/migrations/user/001_create_schema.sql',
-            $only001 . '/001_create_schema.sql',
-        ));
-        $legacy = new UserStore($this->crypto, new UserMigrator($only001), new DataPaths($this->dir));
+        $legacy = new UserStore(
+            $this->crypto,
+            new UserMigrator(UserSchemaCatalog::through(UserStoreFormat::V1Initial)),
+            new DataPaths($this->dir),
+        );
         $legacy->create(self::USER_ID, $this->dek);
         $legacy->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
             $names = array_map(
@@ -93,6 +102,16 @@ class UserStoreTest extends TestCase
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'user_peptide_types'"
             );
             $this->assertNotFalse($peptides === false ? false : $peptides->fetchColumn());
+            $compoundCols = array_map(
+                static fn (array $col): string => (string) $col['name'],
+                $pdo->query('PRAGMA table_info(compounds)')->fetchAll(PDO::FETCH_ASSOC) ?: [],
+            );
+            $this->assertContains('name', $compoundCols);
+            $this->assertContains('is_open', $compoundCols);
+            $this->assertSame(
+                UserStoreFormat::current()->value,
+                (int) $pdo->query('SELECT version FROM user_store_format WHERE id = 1')->fetchColumn(),
+            );
         });
     }
 
@@ -217,6 +236,44 @@ class UserStoreTest extends TestCase
         $this->assertSame('export@example.com', $pdo->query('SELECT email FROM account')->fetchColumn());
     }
 
+    public function testExportDecryptsLegacyStoreAndMutatesToCurrentFormat(): void
+    {
+        $legacy = new UserStore(
+            $this->crypto,
+            new UserMigrator(UserSchemaCatalog::through(UserStoreFormat::V1Initial)),
+            new DataPaths($this->dir),
+        );
+        $legacy->create(self::USER_ID, $this->dek);
+        $legacy->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
+            $pdo->prepare(
+                'INSERT INTO account (user_id, email, password_hash, google_sub, updated_at)
+                 VALUES (?, ?, NULL, NULL, ?)'
+            )->execute([self::USER_ID, 'legacy@example.com', '2026-08-20T15:00:00Z']);
+        });
+        $enc = $this->dir . '/users/' . self::USER_ID . '.sqlite.enc';
+        $before = hash_file('sha256', $enc);
+
+        $bytes = $this->store->exportPlaintext(self::USER_ID, $this->dek);
+        $this->assertStringStartsWith('SQLite format 3', $bytes);
+        $this->assertNotSame($before, hash_file('sha256', $enc));
+        $this->assertSame([], glob($this->dir . '/tmp/*.sqlite') ?: []);
+
+        $tmp = $this->dir . '/legacy-export.sqlite';
+        file_put_contents($tmp, $bytes);
+        $pdo = new PDO('sqlite:' . $tmp);
+        $this->assertSame('legacy@example.com', $pdo->query('SELECT email FROM account')->fetchColumn());
+        $this->assertSame(
+            UserStoreFormat::current()->value,
+            (int) $pdo->query('SELECT version FROM user_store_format WHERE id = 1')->fetchColumn(),
+        );
+        $cols = array_map(
+            static fn (array $col): string => (string) $col['name'],
+            $pdo->query('PRAGMA table_info(compounds)')->fetchAll(PDO::FETCH_ASSOC) ?: [],
+        );
+        $this->assertContains('name', $cols);
+        $this->assertContains('is_open', $cols);
+    }
+
     public function testExportMissingStoreFails(): void
     {
         $this->expectException(UserStoreException::class);
@@ -334,7 +391,7 @@ class UserStoreTest extends TestCase
     {
         return new UserStore(
             $this->crypto ?? Crypto::fromMasterKey(self::HEX_KEY),
-            new UserMigrator(dirname(__DIR__, 3) . '/migrations/user'),
+            new UserMigrator(),
             new DataPaths($this->dir),
             $lockTimeoutMs,
         );

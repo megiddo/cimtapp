@@ -20,6 +20,7 @@ use App\Application\Actions\Compounds\CreateCompoundAction;
 use App\Application\Actions\Compounds\CurrentCompoundAction;
 use App\Application\Actions\Compounds\DeleteCompoundAction;
 use App\Application\Actions\Compounds\ListCompoundsAction;
+use App\Application\Actions\Compounds\ListOpenCompoundsAction;
 use App\Application\Actions\Compounds\PatchCompoundAction;
 use App\Application\Actions\Compounds\ViewCompoundAction;
 use App\Application\Actions\Health\HealthAction;
@@ -73,6 +74,7 @@ return function (App $app): void {
             $authed->post('/bac-bottles/{id}/burn', BurnBacBottleAction::class);
             $authed->get('/compounds', ListCompoundsAction::class);
             $authed->post('/compounds', CreateCompoundAction::class);
+            $authed->get('/compounds/open', ListOpenCompoundsAction::class);
             $authed->get('/compounds/current', CurrentCompoundAction::class);
             $authed->get('/compounds/{id}', ViewCompoundAction::class);
             $authed->patch('/compounds/{id}', PatchCompoundAction::class);

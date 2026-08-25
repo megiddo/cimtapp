@@ -41,7 +41,7 @@ final class CompoundService
     }
 
     /**
-     * Latest compounded_at (not created_at). 404 when none.
+     * Latest open vial by compounded_at (not created_at). 404 when none.
      *
      * @return array<string, mixed>
      */
@@ -56,7 +56,26 @@ final class CompoundService
     }
 
     /**
-     * Remainder summary for GET /me. Null when no vial exists.
+     * Open vials, newest mix first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listOpen(PDO $pdo): array
+    {
+        $stmt = $pdo->query(
+            'SELECT * FROM compounds WHERE is_open = 1 ORDER BY compounded_at DESC, id DESC'
+        );
+        $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $default = $this->syringes->defaultSyringe($pdo);
+
+        return array_values(array_map(
+            fn (array $row): array => $this->present($pdo, $row, $default),
+            is_array($rows) ? $rows : [],
+        ));
+    }
+
+    /**
+     * Remainder summary for GET /me. Null when no open vial exists.
      *
      * @return array<string, mixed>|null
      */
@@ -66,17 +85,19 @@ final class CompoundService
         if ($row === null) {
             return null;
         }
-        $presented = $this->present($pdo, $row, $this->syringes->defaultSyringe($pdo));
 
-        return [
-            'compound_id' => $presented['id'],
-            'peptide_name' => $presented['peptide_type_name'],
-            'remaining_mg' => $presented['remaining_mg'],
-            'remaining_ml' => $presented['remaining_ml'],
-            'remaining_iu' => $presented['remaining_iu'],
-            'concentration' => $presented['concentration'],
-            'compounded_at' => $presented['compounded_at'],
-        ];
+        return $this->remainderSummary($this->present($pdo, $row, $this->syringes->defaultSyringe($pdo)));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function openRemainders(PDO $pdo): array
+    {
+        return array_map(
+            $this->remainderSummary(...),
+            $this->listOpen($pdo),
+        );
     }
 
     /**
@@ -135,6 +156,8 @@ final class CompoundService
         $bacWaterMl = $fields->requirePositiveFloat('bac_water_ml');
         $compoundedAt = $fields->requireDatetime('compounded_at');
         $notes = $fields->optionalString('notes');
+        $name = $this->vialName($fields, $peptide['name'], null);
+        $isOpen = $this->vialOpen($fields, true);
         $id = $this->ids->uuid();
         $now = $this->timestamp();
         $bottleId = $this->bacBottles->debitCurrent($pdo, $bacWaterMl);
@@ -142,10 +165,12 @@ final class CompoundService
         $stmt = $pdo->prepare(
             'INSERT INTO compounds (
                 id, peptide_type_id, peptide_type_slug, peptide_type_name,
-                peptide_mg, bac_water_ml, compounded_at, notes, created_at, bac_bottle_id
+                peptide_mg, bac_water_ml, compounded_at, notes, created_at, bac_bottle_id,
+                name, is_open
              ) VALUES (
                 :id, :peptide_type_id, :peptide_type_slug, :peptide_type_name,
-                :peptide_mg, :bac_water_ml, :compounded_at, :notes, :created_at, :bac_bottle_id
+                :peptide_mg, :bac_water_ml, :compounded_at, :notes, :created_at, :bac_bottle_id,
+                :name, :is_open
              )'
         );
         $stmt->execute([
@@ -159,6 +184,8 @@ final class CompoundService
             ':notes' => $notes,
             ':created_at' => $now,
             ':bac_bottle_id' => $bottleId,
+            ':name' => $name,
+            ':is_open' => $isOpen ? 1 : 0,
         ]);
 
         return $this->get($pdo, $id);
@@ -186,6 +213,8 @@ final class CompoundService
             ? $fields->requireDatetime('compounded_at')
             : (string) $existing['compounded_at'];
         $notes = $fields->has('notes') ? $fields->optionalString('notes') : $existing['notes'];
+        $name = $this->vialName($fields, (string) $existing['peptide_type_name'], (string) $existing['name']);
+        $isOpen = $this->vialOpen($fields, (bool) $existing['is_open']);
 
         $mixChanged = $this->doses->roundMg((float) $existing['peptide_mg']) !== $peptideMg
             || abs((float) $existing['bac_water_ml'] - $bacWaterMl) > 1e-9;
@@ -214,7 +243,9 @@ final class CompoundService
                 bac_water_ml = :bac_water_ml,
                 compounded_at = :compounded_at,
                 notes = :notes,
-                bac_bottle_id = :bac_bottle_id
+                bac_bottle_id = :bac_bottle_id,
+                name = :name,
+                is_open = :is_open
              WHERE id = :id'
         );
         $stmt->execute([
@@ -227,6 +258,8 @@ final class CompoundService
             ':compounded_at' => $compoundedAt,
             ':notes' => $notes,
             ':bac_bottle_id' => $bottleId,
+            ':name' => $name,
+            ':is_open' => $isOpen ? 1 : 0,
         ]);
 
         if ($mixChanged) {
@@ -259,7 +292,7 @@ final class CompoundService
     private function currentRow(PDO $pdo): ?array
     {
         $stmt = $pdo->query(
-            'SELECT * FROM compounds ORDER BY compounded_at DESC, id DESC LIMIT 1'
+            'SELECT * FROM compounds WHERE is_open = 1 ORDER BY compounded_at DESC, id DESC LIMIT 1'
         );
         $row = $stmt === false ? false : $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -298,6 +331,8 @@ final class CompoundService
 
         return [
             'id' => $id,
+            'name' => (string) $row['name'],
+            'is_open' => (int) $row['is_open'] === 1,
             'peptide_type_id' => (string) $row['peptide_type_id'],
             'peptide_type_slug' => (string) $row['peptide_type_slug'],
             'peptide_type_name' => (string) $row['peptide_type_name'],
@@ -313,6 +348,56 @@ final class CompoundService
             'remaining_iu' => $remainder->remainingIu,
             'concentration' => $remainder->concentration,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $presented
+     * @return array<string, mixed>
+     */
+    private function remainderSummary(array $presented): array
+    {
+        return [
+            'compound_id' => $presented['id'],
+            'name' => $presented['name'],
+            'peptide_name' => $presented['peptide_type_name'],
+            'remaining_mg' => $presented['remaining_mg'],
+            'remaining_ml' => $presented['remaining_ml'],
+            'remaining_iu' => $presented['remaining_iu'],
+            'concentration' => $presented['concentration'],
+            'compounded_at' => $presented['compounded_at'],
+            'is_open' => $presented['is_open'],
+        ];
+    }
+
+    private function vialName(FieldParser $fields, string $peptideName, ?string $existing): string
+    {
+        if (!$fields->has('name')) {
+            return $existing ?? $peptideName;
+        }
+
+        $name = $fields->optionalString('name');
+        if ($name === null) {
+            throw new ValidationException(['name' => [DoseConfig::MUST_BE_TEXT]]);
+        }
+        if (strlen($name) > DoseConfig::VIAL_NAME_MAX) {
+            throw new ValidationException(['name' => [DoseConfig::VIAL_NAME_TOO_LONG]]);
+        }
+
+        return $name;
+    }
+
+    private function vialOpen(FieldParser $fields, bool $fallback): bool
+    {
+        if (!$fields->has('is_open')) {
+            return $fallback;
+        }
+
+        $open = $fields->optionalBool('is_open');
+        if ($open === null) {
+            throw new ValidationException(['is_open' => [DoseConfig::MUST_BE_BOOLEAN]]);
+        }
+
+        return $open;
     }
 
     private function assertMixFitsUses(PDO $pdo, string $compoundId, float $peptideMg, float $bacWaterMl): void

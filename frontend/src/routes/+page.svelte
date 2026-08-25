@@ -3,49 +3,52 @@
   import { formatConcentration, formatDoseLine, formatMg, formatMl, formatIu } from '$lib/dose';
   import { formatDateTime } from '$lib/history';
   import { remainderTone, remainderToneMessage } from '$lib/remainder';
-  import { fetchCurrentCompound, fetchUses, type Compound, type LoggedUse } from '$lib/inventory';
+  import { fetchOpenCompounds, fetchUses, vialLabel, type Compound, type LoggedUse } from '$lib/inventory';
 
-  let current = $state<Compound | null>(null);
+  let open = $state<Compound[]>([]);
   let uses = $state<LoggedUse[]>([]);
   let loaded = $state(false);
 
   onMount(async () => {
-    current = await fetchCurrentCompound();
+    open = await fetchOpenCompounds();
     uses = await fetchUses({ limit: 5 });
     loaded = true;
   });
 
-  const tone = $derived(current ? remainderTone(current.remaining_mg, current.peptide_mg) : 'default');
-  const toneMessage = $derived(remainderToneMessage(tone));
   const last = $derived(uses[0] ?? null);
 </script>
 
 {#if !loaded}
   <p class="muted">Loading…</p>
-{:else if !current}
+{:else if open.length === 0}
   <div class="empty-state">
     <p>Add to inventory to start tracking remainder.</p>
     <a class="chip" href="/inventory/new">Add to Inventory</a>
   </div>
 {:else}
-  <section class="hero {tone}">
-    <div class="peptide">{current.peptide_type_name}</div>
-    <div class="mg">{formatMg(current.remaining_mg)} mg</div>
-    <div class="meta">
-      {formatMl(current.remaining_ml)} mL · {formatIu(current.remaining_iu)} IU
-    </div>
-    <div class="meta">{formatConcentration(current.concentration)}</div>
-    <div class="meta">Mixed {current.compounded_at.replace('T', ' ')}</div>
-    {#if toneMessage}
-      <p class="tone {tone}">{toneMessage}</p>
-    {/if}
-  </section>
-
-  {#if tone === 'danger'}
-    <a class="chip" href="/inventory/new">Add to Inventory</a>
-  {:else if last}
-    <a class="chip" href="/use/new?iu={last.iu}">Log {formatIu(last.iu)} IU again</a>
-  {/if}
+  {#each open as vial (vial.id)}
+    {@const tone = remainderTone(vial.remaining_mg, vial.peptide_mg)}
+    {@const toneMessage = remainderToneMessage(tone)}
+    <section class="hero {tone}">
+      <div class="peptide">{vialLabel(vial)}</div>
+      <div class="mg">{formatMg(vial.remaining_mg)} mg</div>
+      <div class="meta">
+        {formatMl(vial.remaining_ml)} mL · {formatIu(vial.remaining_iu)} IU
+      </div>
+      <div class="meta">{formatConcentration(vial.concentration)}</div>
+      <div class="meta">Mixed {vial.compounded_at.replace('T', ' ')}</div>
+      {#if toneMessage}
+        <p class="tone {tone}">{toneMessage}</p>
+      {/if}
+      {#if tone === 'danger'}
+        <a class="chip" href="/inventory/new">Add to Inventory</a>
+      {:else}
+        <a class="chip" href="/use/new?compound_id={vial.id}{last && last.compound_id === vial.id ? `&iu=${last.iu}` : ''}">
+          {last && last.compound_id === vial.id ? `Log ${formatIu(last.iu)} IU again` : 'Log use'}
+        </a>
+      {/if}
+    </section>
+  {/each}
 
   {#if uses.length === 0}
     <p>No uses yet. Log a use from the Log tab.</p>
@@ -55,7 +58,7 @@
         <a class="row" href="/history/{use.id}">
           <span>
             <span class="primary">{formatDoseLine(use.iu, use.peptide_mg)}</span>
-            <div class="secondary">{formatDateTime(use.used_at)} · {use.peptide_type_name}</div>
+            <div class="secondary">{formatDateTime(use.used_at)} · {vialLabel({ name: use.compound_name, peptide_type_name: use.peptide_type_name })}</div>
           </span>
         </a>
       {/each}

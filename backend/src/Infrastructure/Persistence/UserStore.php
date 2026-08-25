@@ -106,8 +106,9 @@ final class UserStore implements UserStorePort
     }
 
     /**
-     * Decrypt the user store into memory and shred the tmp file before returning.
-     * Does not rewrite the .enc file.
+     * Decrypt the user store, apply pending schema mutations, and return
+     * plaintext sqlite bytes. Temp files are shredded before returning.
+     * Rewrites the .enc file only when a mutation was applied.
      */
     public function exportPlaintext(string $userId, string $dek): string
     {
@@ -121,16 +122,25 @@ final class UserStore implements UserStorePort
             }
 
             $plainPath = $this->uniquePlainPath($userId);
+            $staging = $this->paths->userEncStaging($userId);
             try {
                 $this->crypto->decryptFile($encPath, $plainPath, $dek);
+                $applied = $this->userMigrator->migrate($plainPath);
                 $bytes = file_get_contents($plainPath);
                 if (!is_string($bytes) || $bytes === '') {
                     throw new UserStoreException('Unable to export user store.');
+                }
+                if ($applied > 0) {
+                    $this->crypto->encryptFile($plainPath, $staging, $dek);
+                    if (!@rename($staging, $encPath)) {
+                        throw new UserStoreException('Failed to persist user store.');
+                    }
                 }
 
                 return $bytes;
             } finally {
                 $this->shred($plainPath);
+                $this->unlinkIfExists($staging);
             }
         });
     }
