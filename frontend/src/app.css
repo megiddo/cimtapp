@@ -477,12 +477,8 @@ a.card:focus-visible {
   opacity: 0.55;
 }
 
-.stock-actions {
-  display: grid;
-  grid-template-columns: 4.5rem 1fr 1fr;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  align-items: stretch;
+.stock-actions.pair {
+  grid-template-columns: 1fr 1fr;
 }
 
 .stock-actions input {

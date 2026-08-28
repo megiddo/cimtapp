@@ -27,3 +27,7 @@ export function remainderToneMessage(tone: RemainderTone): string | null {
   }
   return null;
 }
+
+export function isDepleted(remaining: number): boolean {
+  return remaining <= 0;
+}

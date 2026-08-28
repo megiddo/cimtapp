@@ -28,10 +28,10 @@ class UserSchemaMigratorTest extends TestCase
         parent::tearDown();
     }
 
-    public function testCurrentFormatIsNamedOpenVials(): void
+    public function testCurrentFormatIsArchiveAndAdjustments(): void
     {
-        $this->assertSame(UserStoreFormat::V4NamedOpenVials, UserStoreFormat::current());
-        $this->assertSame(4, UserStoreFormat::current()->value);
+        $this->assertSame(UserStoreFormat::V5ArchiveAndAdjustments, UserStoreFormat::current());
+        $this->assertSame(5, UserStoreFormat::current()->value);
     }
 
     public function testCatalogAppliesStrategiesInVersionOrder(): void
@@ -40,25 +40,30 @@ class UserSchemaMigratorTest extends TestCase
             static fn ($strategy): int => $strategy->version()->value,
             UserSchemaCatalog::default()->strategies(),
         );
-        $this->assertSame([1, 2, 3, 4], $versions);
+        $this->assertSame([1, 2, 3, 4, 5], $versions);
         $this->assertCount(1, UserSchemaCatalog::through(UserStoreFormat::V1Initial)->strategies());
         $this->assertCount(2, UserSchemaCatalog::through(UserStoreFormat::V2BacAndSyringeStock)->strategies());
         $this->assertCount(4, UserSchemaCatalog::through(UserStoreFormat::V4NamedOpenVials)->strategies());
+        $this->assertCount(5, UserSchemaCatalog::through(UserStoreFormat::V5ArchiveAndAdjustments)->strategies());
         $this->assertDirectoryExists(UserSchemaCatalog::migrationsDirectory());
         $this->assertFileExists(UserSchemaCatalog::migrationsDirectory() . '/004_named_open_vials.sql');
+        $this->assertFileExists(UserSchemaCatalog::migrationsDirectory() . '/005_archive_and_adjustments.sql');
     }
 
     public function testFreshSqliteReachesCurrentFormat(): void
     {
         $path = $this->dir . '/fresh.sqlite';
         $applied = (new UserMigrator())->migrate($path);
-        $this->assertSame(4, $applied);
+        $this->assertSame(5, $applied);
         $this->assertSame(0, (new UserMigrator())->migrate($path));
 
         $pdo = $this->pdo($path);
-        $this->assertSame(4, (new UserSchemaVersionDetector())->detect($pdo));
+        $this->assertSame(5, (new UserSchemaVersionDetector())->detect($pdo));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'name'));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'is_open'));
+        $this->assertTrue($this->hasColumn($pdo, 'compounds', 'archived_at'));
+        $this->assertTrue($this->hasColumn($pdo, 'bac_bottles', 'archived_at'));
+        $this->assertTrue($this->tableExists($pdo, 'compound_adjustments'));
         $this->assertTrue($this->tableExists($pdo, 'user_peptide_types'));
         $this->assertTrue($this->tableExists($pdo, 'bac_bottles'));
     }
@@ -78,10 +83,11 @@ class UserSchemaMigratorTest extends TestCase
         $pdo = null;
 
         $applied = (new UserMigrator())->migrate($path);
-        $this->assertSame(3, $applied);
+        $this->assertSame(4, $applied);
         $pdo = $this->pdo($path);
-        $this->assertSame(4, (new UserSchemaVersionDetector())->detect($pdo));
+        $this->assertSame(5, (new UserSchemaVersionDetector())->detect($pdo));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'name'));
+        $this->assertTrue($this->hasColumn($pdo, 'compounds', 'archived_at'));
     }
 
     public function testDetectsSchemaShapeWhenMigrationsTableIsMissing(): void
@@ -110,6 +116,10 @@ class UserSchemaMigratorTest extends TestCase
         $v4 = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $v4->exec('CREATE TABLE compounds (id TEXT, name TEXT)');
         $this->assertSame(4, $detector->detect($v4));
+
+        $v5 = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $v5->exec('CREATE TABLE compound_adjustments (id TEXT)');
+        $this->assertSame(5, $detector->detect($v5));
     }
 
     public function testStoredFormatVersionWinsOverShape(): void
@@ -122,6 +132,9 @@ class UserSchemaMigratorTest extends TestCase
 
         $detector->writeVersion($pdo, 4);
         $this->assertSame(4, $detector->detect($pdo));
+
+        $detector->writeVersion($pdo, 5);
+        $this->assertSame(5, $detector->detect($pdo));
     }
 
     public function testEmptyFormatTableFallsThroughToShape(): void

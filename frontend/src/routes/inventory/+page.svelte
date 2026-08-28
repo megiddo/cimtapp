@@ -48,7 +48,7 @@
     <h2 class="day-heading">Vials</h2>
     {#if compounds.length === 0}
       <div class="empty-state">
-        <p>No vials mixed yet.</p>
+        <p>No vials in inventory.</p>
       </div>
     {:else}
       <div class="cards">

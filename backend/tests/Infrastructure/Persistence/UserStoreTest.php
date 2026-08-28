@@ -50,7 +50,7 @@ class UserStoreTest extends TestCase
         $this->assertSame([], glob($this->dir . '/tmp/*.sqlite') ?: []);
 
         $this->store->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
-            foreach (['account', 'syringe_profiles', 'compounds', 'uses', 'bac_bottles', 'user_peptide_types', 'user_store_format'] as $table) {
+            foreach (['account', 'syringe_profiles', 'compounds', 'uses', 'bac_bottles', 'user_peptide_types', 'compound_adjustments', 'user_store_format'] as $table) {
                 $stmt = $pdo->prepare(
                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name"
                 );
@@ -65,6 +65,7 @@ class UserStoreTest extends TestCase
             );
             $this->assertContains('name', $names);
             $this->assertContains('is_open', $names);
+            $this->assertContains('archived_at', $names);
         });
     }
 
@@ -108,6 +109,7 @@ class UserStoreTest extends TestCase
             );
             $this->assertContains('name', $compoundCols);
             $this->assertContains('is_open', $compoundCols);
+            $this->assertContains('archived_at', $compoundCols);
             $this->assertSame(
                 UserStoreFormat::current()->value,
                 (int) $pdo->query('SELECT version FROM user_store_format WHERE id = 1')->fetchColumn(),
@@ -272,6 +274,7 @@ class UserStoreTest extends TestCase
         );
         $this->assertContains('name', $cols);
         $this->assertContains('is_open', $cols);
+        $this->assertContains('archived_at', $cols);
     }
 
     public function testExportMissingStoreFails(): void

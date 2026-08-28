@@ -43,6 +43,16 @@ class DoseCalculatorTest extends TestCase
         );
     }
 
+    public function testRemainingIncludesVolumeAdjustmentAndDepleted(): void
+    {
+        $remainder = $this->calc->remaining(10.0, 1.25, 2.0, 0.5, 50.0, -1.25);
+        $this->assertEqualsWithDelta(7.5, $remainder->remainingMg, 1e-12);
+        $this->assertEqualsWithDelta(1.5, $remainder->remainingMl, 1e-12);
+        $this->assertTrue($this->calc->isDepleted(0.0));
+        $this->assertTrue($this->calc->isDepleted(-0.01));
+        $this->assertFalse($this->calc->isDepleted(0.001));
+    }
+
     public function testNonU100SyringeOneMlPerFortyIu(): void
     {
         $this->assertEqualsWithDelta(0.025, $this->calc->mlPerIu(1.0, 40.0), 1e-12);

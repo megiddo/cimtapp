@@ -24,6 +24,7 @@ export type BacBottle = {
   opened_at: string;
   notes: string | null;
   created_at: string;
+  archived_at: string | null;
   is_current: boolean;
 };
 
@@ -31,6 +32,7 @@ export type Compound = {
   id: string;
   name: string;
   is_open: boolean;
+  archived_at: string | null;
   peptide_type_id: string;
   peptide_type_slug: string;
   peptide_type_name: string;
@@ -41,6 +43,7 @@ export type Compound = {
   created_at: string;
   bac_bottle_id: string | null;
   has_uses: boolean;
+  adjustment_mg: number;
   remaining_mg: number;
   remaining_ml: number;
   remaining_iu: number;
@@ -212,6 +215,16 @@ export async function burnBacBottle(
   return asResult(payload, 'Unable to burn bacteriostatic water.');
 }
 
+export async function archiveBacBottle(id: string, baseUrl = ''): Promise<DomainResult<BacBottle>> {
+  const payload = await readAction<BacBottle>(`/api/v1/bac-bottles/${id}/archive`, {
+    baseUrl,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  return asResult(payload, 'Unable to archive bottle.');
+}
+
 export async function deleteBacBottle(id: string, baseUrl = ''): Promise<DomainResult<null>> {
   const payload = await readAction<null>(`/api/v1/bac-bottles/${id}`, {
     baseUrl,
@@ -309,6 +322,30 @@ export async function deleteCompound(id: string, baseUrl = ''): Promise<DomainRe
     genericErrorMessage(payload, 'Unable to delete vial.'),
     remainingIuFrom(payload)
   );
+}
+
+export async function adjustCompound(
+  id: string,
+  body: { remaining_ml: number; notes?: string | null },
+  baseUrl = ''
+): Promise<DomainResult<Compound>> {
+  const payload = await readAction<Compound>(`/api/v1/compounds/${id}/adjust`, {
+    baseUrl,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return asResult(payload, 'Unable to adjust remaining volume.');
+}
+
+export async function archiveCompound(id: string, baseUrl = ''): Promise<DomainResult<Compound>> {
+  const payload = await readAction<Compound>(`/api/v1/compounds/${id}/archive`, {
+    baseUrl,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  return asResult(payload, 'Unable to archive vial.');
 }
 
 export async function logUse(

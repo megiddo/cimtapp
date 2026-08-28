@@ -78,11 +78,12 @@ Each user sqlite includes an `account` snapshot (email, password hash, google_su
 
 - `account` (1 row): user_id, email, password_hash, google_sub, updated_at
 - `syringe_profiles`: id, label, volume_ml > 0, capacity_iu > 0, is_default (exactly one)
-- `compounds`: id, **name** (vial identifier), **is_open**, peptide_type_id + slug/name, peptide_mg, bac_water_ml, compounded_at, notes, created_at
+- `compounds`: id, **name** (vial identifier), **is_open**, **archived_at** (v5; hidden from inventory when set), peptide_type_id + slug/name, peptide_mg, bac_water_ml, compounded_at, notes, created_at
+- `compound_adjustments` (v5): id, compound_id, delta_mg, remaining_ml snapshot, notes, created_at — manual remaining corrections
 - `uses`: id, compound_id, iu, syringe snapshots, volume_ml, peptide_mg, used_at, notes, created_at/updated_at
 - `user_store_format`: single-row integer format version (strategy migrations)
 
-Open vials (`is_open = 1`) can coexist. Home and Log list them by **name + peptide**. `GET /compounds/current` is the latest **open** `compounded_at`. Closed vials stay in inventory. Compounds stay editable after uses; changing `peptide_mg` or `bac_water_ml` recalculates stored use milligrams. Delete is allowed only when the vial has no uses.
+Open vials (`is_open = 1`, not archived) can coexist. Home and Log list them by **name + peptide**. `GET /compounds/current` is the latest **open** `compounded_at`. Closed vials stay in inventory until remaining is 0 and they are archived. Remaining volume is computed from uses plus `compound_adjustments`. Compounds stay editable after uses; changing `peptide_mg` or `bac_water_ml` recalculates stored use milligrams. Delete is allowed only when the vial has no uses.
 
 ## API (`/api/v1`, JSON, cookie auth)
 
@@ -134,16 +135,19 @@ Success bodies stay `{ "statusCode": 201, "data": { ... } }`. `GET /me` data is 
 | GET | `/peptide-types` | global catalog, active only, `sort_order` (`id` = slug) |
 | GET/POST | `/syringes` | list / create (`volume_ml` > 0, `capacity_iu` > 0; auto label `0.5 mL / 50 IU` if omitted; exactly one `is_default`) |
 | PATCH | `/syringes/{id}` | label and/or default flag (setting default unsets others) |
-| GET/POST | `/compounds` | inventory (`compounded_at DESC`, includes remaining, name, is_open) / mix (`name` optional, defaults to peptide) |
+| GET/POST | `/compounds` | inventory (`compounded_at DESC`, remaining, name, is_open; **excludes archived**) / mix (`name` optional, defaults to peptide) |
 | GET | `/compounds/open` | open vials only, newest mix first |
 | GET | `/compounds/current` | latest **open** `compounded_at` + remainder at default syringe. **404** when none (SPA treats empty) |
 | GET | `/compounds/{id}` | one mix + remainder |
 | PATCH | `/compounds/{id}` | name, is_open, mix fields; mix changes recalc use mg and 422 if uses would overdraw |
+| POST | `/compounds/{id}/adjust` | set `remaining_ml` (0 to mix volume); stores a milligram delta; 422 if archived |
+| POST | `/compounds/{id}/archive` | hide an empty vial from inventory lists; closes it; 422 if remaining > 0 |
 | DELETE | `/compounds/{id}` | 204 if unused; 422 if the vial has uses |
 | GET/POST | `/uses` | list `used_at DESC, id DESC` / log against current (or `compound_id`) |
 | PATCH | `/uses/{id}` | iu, syringe, used_at, notes; recalc mg; re-check remainder (original use put back first) |
 | DELETE | `/uses/{id}` | 204; remainder on the vial increases |
 | GET | `/uses/{id}` | one use |
+| POST | `/bac-bottles/{id}/archive` | hide an empty bottle from inventory lists; 422 if remaining > 0 |
 
 `GET /uses?before=iso&limit=50`. Default limit 50, cap 100. `before` is exclusive on `used_at`. POST `/uses` snapshots syringe onto the row. Default syringe for a new use: last-used if that profile still exists, else the default syringe. Edits keep the original vial.
 
@@ -173,7 +177,7 @@ Do not assume U-100. A syringe is `(volume_ml, capacity_iu)`.
 concentration = peptide_mg / bac_water_ml          # mg/mL
 volume_ml     = iu × (syringe_volume_ml / syringe_capacity_iu)
 peptide_mg    = volume_ml × concentration
-remaining_mg  = compound.peptide_mg − Σ use.peptide_mg
+remaining_mg  = compound.peptide_mg − Σ use.peptide_mg + Σ adjustment.delta_mg
 remaining_ml  = remaining_mg / concentration
 remaining_iu  = remaining_ml / (syringe_volume_ml / syringe_capacity_iu)
 ```

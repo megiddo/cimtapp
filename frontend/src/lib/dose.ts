@@ -90,10 +90,11 @@ export function remainingFor(
   usedPeptideMgSum: number,
   bacWaterMl: number,
   syringeVolumeMl: number,
-  syringeCapacityIu: number
+  syringeCapacityIu: number,
+  adjustmentMg = 0
 ): Omit<DosePreview, 'volumeMl' | 'peptideMg'> {
   const conc = concentration(compoundPeptideMg, bacWaterMl);
-  const remainingMg = roundMg(compoundPeptideMg - usedPeptideMgSum);
+  const remainingMg = roundMg(compoundPeptideMg - usedPeptideMgSum + adjustmentMg);
   const remainingMl = roundVolume(remainingMg / conc);
   const remainingIu = roundIu(remainingMl / mlPerIu(syringeVolumeMl, syringeCapacityIu));
   return {

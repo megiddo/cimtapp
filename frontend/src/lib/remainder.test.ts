@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { remainderTone, remainderToneMessage, remainingFraction } from './remainder';
+import { remainderTone, remainderToneMessage, remainingFraction, isDepleted } from './remainder';
 
 describe('remainder tone', () => {
   it('is default above 20 percent remaining', () => {
@@ -21,5 +21,8 @@ describe('remainder tone', () => {
     expect(remainderTone(1, 0)).toBe('danger');
     expect(remainingFraction(1, 0)).toBe(0);
     expect(remainderToneMessage('danger')).toBe('Empty — add to inventory.');
+    expect(isDepleted(0)).toBe(true);
+    expect(isDepleted(-0.01)).toBe(true);
+    expect(isDepleted(0.01)).toBe(false);
   });
 });

@@ -92,6 +92,16 @@ final class FieldParser
         return $value;
     }
 
+    public function requireNonNegativeFloat(string $key): float
+    {
+        $value = $this->requireFloat($key);
+        if ($value < 0.0) {
+            throw new ValidationException([$key => [DoseConfig::MUST_BE_NON_NEGATIVE]]);
+        }
+
+        return $value;
+    }
+
     public function requirePositiveInt(string $key): int
     {
         $value = $this->requireFloat($key);
