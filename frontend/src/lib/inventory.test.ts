@@ -32,7 +32,10 @@ import {
   restockSyringe,
   vialLabel,
   burnSyringe,
-  burnBacBottle
+  burnBacBottle,
+  archiveBacBottle,
+  archiveCompound,
+  adjustCompound
 } from './inventory';
 
 function jsonResponse(status: number, body: unknown) {
@@ -483,5 +486,61 @@ describe('inventory API client', () => {
       )
     );
     await expect(burnBacBottle('b1', 3)).resolves.toMatchObject({ ok: false, status: 422 });
+  });
+
+  it('adjusts remaining volume and archives empty inventory', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(200, { statusCode: 200, data: { id: 'c1', remaining_ml: 1.5, adjustment_mg: -1.25 } })
+      )
+    );
+    await expect(adjustCompound('c1', { remaining_ml: 1.5 })).resolves.toMatchObject({ ok: true, status: 200 });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(422, {
+          statusCode: 422,
+          error: {
+            type: 'VALIDATION_ERROR',
+            description: 'Remaining cannot exceed the mix volume.',
+            fields: { remaining_ml: ['Remaining cannot exceed the mix volume.'] }
+          }
+        })
+      )
+    );
+    await expect(adjustCompound('c1', { remaining_ml: 3 })).resolves.toMatchObject({ ok: false, status: 422 });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(200, { statusCode: 200, data: { id: 'c1', archived_at: '2026-08-27T16:00:00Z' } })
+      )
+    );
+    await expect(archiveCompound('c1')).resolves.toMatchObject({ ok: true, status: 200 });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(200, { statusCode: 200, data: { id: 'b1', archived_at: '2026-08-27T16:00:00Z' } })
+      )
+    );
+    await expect(archiveBacBottle('b1')).resolves.toMatchObject({ ok: true, status: 200 });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(422, {
+          statusCode: 422,
+          error: {
+            type: 'VALIDATION_ERROR',
+            description: 'Archive is available when remaining is 0.',
+            fields: { id: ['Archive is available when remaining is 0.'] }
+          }
+        })
+      )
+    );
+    await expect(archiveCompound('c1')).resolves.toMatchObject({ ok: false, status: 422 });
   });
 });

@@ -81,6 +81,33 @@ class BacBottleServiceTest extends TestCase
         }
     }
 
+    public function testArchiveHidesEmptyBottle(): void
+    {
+        $pdo = $this->pdo();
+        $service = $this->service();
+        $bottle = $service->create($pdo, FieldParser::from(['volume_ml' => 10]));
+
+        try {
+            $service->archive($pdo, (string) $bottle['id']);
+            $this->fail('expected');
+        } catch (ValidationException $e) {
+            $this->assertSame(['id' => [DoseConfig::ARCHIVE_NOT_EMPTY]], $e->fields());
+        }
+
+        $service->burn($pdo, (string) $bottle['id'], FieldParser::from(['ml' => 10]));
+        $archived = $service->archive($pdo, (string) $bottle['id']);
+        $this->assertNotNull($archived['archived_at']);
+        $this->assertSame([], $service->list($pdo));
+        $this->assertNotNull($service->get($pdo, (string) $bottle['id'])['archived_at']);
+
+        try {
+            $service->archive($pdo, (string) $bottle['id']);
+            $this->fail('expected');
+        } catch (ValidationException $e) {
+            $this->assertSame(['id' => [DoseConfig::ALREADY_ARCHIVED]], $e->fields());
+        }
+    }
+
     private function service(): BacBottleService
     {
         return new BacBottleService(new DoseCalculator(), new IdGenerator(), FrozenClock::at('2026-08-20T15:00:00Z'));
@@ -97,7 +124,8 @@ class BacBottleServiceTest extends TestCase
                 remaining_ml REAL NOT NULL,
                 opened_at TEXT NOT NULL,
                 notes TEXT,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                archived_at TEXT
             )'
         );
 

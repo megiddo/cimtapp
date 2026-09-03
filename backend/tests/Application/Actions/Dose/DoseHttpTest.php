@@ -87,6 +87,8 @@ class DoseHttpTest extends TestCase
         $this->assertEqualsWithDelta(10.0, $compound['remaining_mg'], 1e-9);
         $this->assertEqualsWithDelta(200.0, $compound['remaining_iu'], 1e-9);
         $this->assertFalse($compound['has_uses']);
+        $this->assertNull($compound['archived_at']);
+        $this->assertEqualsWithDelta(0.0, $compound['adjustment_mg'], 1e-9);
 
         $current = $this->json($this->authed($app, 'GET', '/api/v1/compounds/current', $sid))['data'];
         $this->assertSame($compound['id'], $current['id']);
@@ -229,6 +231,138 @@ class DoseHttpTest extends TestCase
         $this->assertFalse($closedMix['is_open']);
         $this->assertSame('Archive', $closedMix['name']);
         $this->assertCount(3, $this->json($this->authed($app, 'GET', '/api/v1/compounds/open', $sid))['data']);
+    }
+
+    public function testVolumeAdjustAndArchiveHideEmptyInventory(): void
+    {
+        $app = $this->getAppInstance();
+        $sid = $this->register($app);
+        $compound = $this->json($this->mixTirzepatide($app, $sid, '2026-08-20T12:00'))['data'];
+        $id = (string) $compound['id'];
+
+        $logged = $this->json($this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 25,
+            'used_at' => '2026-08-20T16:00',
+        ], $sid));
+        $this->assertSame(201, $logged['statusCode']);
+        $useId = (string) $logged['data']['id'];
+
+        $short = $this->json($this->authedJson($app, 'POST', '/api/v1/compounds/' . $id . '/adjust', [
+            'remaining_ml' => 1.5,
+        ], $sid))['data'];
+        $this->assertEqualsWithDelta(1.5, $short['remaining_ml'], 1e-9);
+        $this->assertEqualsWithDelta(7.5, $short['remaining_mg'], 1e-9);
+        $this->assertEqualsWithDelta(150.0, $short['remaining_iu'], 1e-9);
+        $this->assertLessThan(0.0, $short['adjustment_mg']);
+
+        $long = $this->json($this->authedJson($app, 'POST', '/api/v1/compounds/' . $id . '/adjust', [
+            'remaining_ml' => 1.9,
+            'notes' => 'syringe short',
+        ], $sid))['data'];
+        $this->assertEqualsWithDelta(1.9, $long['remaining_ml'], 1e-9);
+        $this->assertEqualsWithDelta(9.5, $long['remaining_mg'], 1e-9);
+
+        $same = $this->json($this->authedJson($app, 'POST', '/api/v1/compounds/' . $id . '/adjust', [
+            'remaining_ml' => 1.9,
+        ], $sid))['data'];
+        $this->assertEqualsWithDelta(1.9, $same['remaining_ml'], 1e-9);
+
+        $overMix = $this->authedJson($app, 'POST', '/api/v1/compounds/' . $id . '/adjust', [
+            'remaining_ml' => 2.1,
+        ], $sid);
+        $this->assertSame(422, $overMix->getStatusCode());
+        $this->assertSame(
+            ['remaining_ml' => [DoseConfig::REMAINING_EXCEEDS_MIX]],
+            $this->json($overMix)['error']['fields'],
+        );
+
+        $negative = $this->authedJson($app, 'POST', '/api/v1/compounds/' . $id . '/adjust', [
+            'remaining_ml' => -0.1,
+        ], $sid);
+        $this->assertSame(422, $negative->getStatusCode());
+        $this->assertSame(
+            ['remaining_ml' => [DoseConfig::MUST_BE_NON_NEGATIVE]],
+            $this->json($negative)['error']['fields'],
+        );
+
+        $stillFull = $this->authedJson($app, 'POST', '/api/v1/compounds/' . $id . '/archive', [], $sid);
+        $this->assertSame(422, $stillFull->getStatusCode());
+        $this->assertSame(
+            ['id' => [DoseConfig::ARCHIVE_NOT_EMPTY]],
+            $this->json($stillFull)['error']['fields'],
+        );
+
+        $emptied = $this->json($this->authedJson($app, 'POST', '/api/v1/compounds/' . $id . '/adjust', [
+            'remaining_ml' => 0,
+        ], $sid))['data'];
+        $this->assertEqualsWithDelta(0.0, $emptied['remaining_mg'], 1e-9);
+
+        $overdraw = $this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 25,
+            'compound_id' => $id,
+        ], $sid);
+        $this->assertSame(422, $overdraw->getStatusCode());
+        $this->assertEqualsWithDelta(0.0, (float) $this->json($overdraw)['error']['remaining_iu'], 1e-9);
+
+        $archived = $this->json($this->authedJson($app, 'POST', '/api/v1/compounds/' . $id . '/archive', [], $sid))['data'];
+        $this->assertNotNull($archived['archived_at']);
+        $this->assertFalse($archived['is_open']);
+
+        $ids = array_map(
+            static fn (array $row): string => (string) $row['id'],
+            $this->json($this->authed($app, 'GET', '/api/v1/compounds', $sid))['data'],
+        );
+        $this->assertNotContains($id, $ids);
+        $this->assertSame([], $this->json($this->authed($app, 'GET', '/api/v1/compounds/open', $sid))['data']);
+        $this->assertSame(404, $this->authed($app, 'GET', '/api/v1/compounds/current', $sid)->getStatusCode());
+
+        $fetched = $this->json($this->authed($app, 'GET', '/api/v1/compounds/' . $id, $sid))['data'];
+        $this->assertNotNull($fetched['archived_at']);
+
+        $this->assertSame(422, $this->authedJson($app, 'POST', '/api/v1/compounds/' . $id . '/archive', [], $sid)->getStatusCode());
+        $this->assertSame(422, $this->authedJson($app, 'POST', '/api/v1/compounds/' . $id . '/adjust', [
+            'remaining_ml' => 0.5,
+        ], $sid)->getStatusCode());
+        $this->assertSame(422, $this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $id, [
+            'is_open' => true,
+        ], $sid)->getStatusCode());
+        $this->assertSame(422, $this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 5,
+            'compound_id' => $id,
+        ], $sid)->getStatusCode());
+        $this->assertSame(422, $this->authedJson($app, 'PATCH', '/api/v1/uses/' . $useId, [
+            'iu' => 10,
+        ], $sid)->getStatusCode());
+        $this->assertSame(422, $this->authed($app, 'DELETE', '/api/v1/uses/' . $useId, $sid)->getStatusCode());
+
+        $this->assertSame(404, $this->authedJson($app, 'POST', '/api/v1/compounds/missing/adjust', [
+            'remaining_ml' => 0.5,
+        ], $sid)->getStatusCode());
+        $this->assertSame(404, $this->authedJson($app, 'POST', '/api/v1/compounds/missing/archive', [], $sid)->getStatusCode());
+
+        $bottle = $this->json($this->authed($app, 'GET', '/api/v1/bac-bottles/current', $sid))['data'];
+        $this->authedJson($app, 'POST', '/api/v1/bac-bottles/' . $bottle['id'] . '/burn', [
+            'ml' => $bottle['remaining_ml'],
+        ], $sid);
+        $emptyBottle = $this->json($this->authed($app, 'GET', '/api/v1/bac-bottles/' . $bottle['id'], $sid))['data'];
+        $this->assertEqualsWithDelta(0.0, $emptyBottle['remaining_ml'], 1e-9);
+
+        $notEmptyBottle = $this->json($this->authedJson($app, 'POST', '/api/v1/bac-bottles', [
+            'volume_ml' => 10,
+            'opened_at' => '2026-08-22T00:00',
+        ], $sid))['data'];
+        $this->assertSame(422, $this->authedJson($app, 'POST', '/api/v1/bac-bottles/' . $notEmptyBottle['id'] . '/archive', [], $sid)->getStatusCode());
+
+        $archivedBottle = $this->json($this->authedJson($app, 'POST', '/api/v1/bac-bottles/' . $bottle['id'] . '/archive', [], $sid))['data'];
+        $this->assertNotNull($archivedBottle['archived_at']);
+        $listedBottles = array_map(
+            static fn (array $row): string => (string) $row['id'],
+            $this->json($this->authed($app, 'GET', '/api/v1/bac-bottles', $sid))['data'],
+        );
+        $this->assertNotContains($bottle['id'], $listedBottles);
+        $this->assertContains($notEmptyBottle['id'], $listedBottles);
+        $this->assertSame(422, $this->authedJson($app, 'POST', '/api/v1/bac-bottles/' . $bottle['id'] . '/archive', [], $sid)->getStatusCode());
+        $this->assertSame(404, $this->authedJson($app, 'POST', '/api/v1/bac-bottles/missing/archive', [], $sid)->getStatusCode());
     }
 
     public function testLogUseWorkedExampleOverdrawBoundaryAndEditRemainder(): void

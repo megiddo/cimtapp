@@ -25,6 +25,7 @@ final class UserSchemaCatalog
             new AddBacAndSyringeStock($dir),
             new AddUserPeptideTypes($dir),
             new AddNamedOpenVials($dir),
+            new AddArchiveAndAdjustments($dir),
         ]));
     }
 

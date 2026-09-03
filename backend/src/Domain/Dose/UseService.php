@@ -142,6 +142,9 @@ final class UseService
     {
         $existing = $this->get($pdo, $id);
         $compound = $this->compounds->get($pdo, (string) $existing['compound_id']);
+        if ($compound['archived_at'] !== null) {
+            throw new ValidationException(['id' => [DoseConfig::COMPOUND_ARCHIVED]], DoseConfig::COMPOUND_ARCHIVED);
+        }
         $iu = $fields->has('iu') ? $this->requireIu($fields) : (float) $existing['iu'];
         $usedAt = $fields->has('used_at')
             ? $fields->requireDatetime('used_at')
@@ -202,7 +205,11 @@ final class UseService
 
     public function delete(PDO $pdo, string $id): void
     {
-        $this->get($pdo, $id);
+        $existing = $this->get($pdo, $id);
+        $compound = $this->compounds->get($pdo, (string) $existing['compound_id']);
+        if ($compound['archived_at'] !== null) {
+            throw new ValidationException(['id' => [DoseConfig::COMPOUND_ARCHIVED]], DoseConfig::COMPOUND_ARCHIVED);
+        }
         $stmt = $pdo->prepare('DELETE FROM uses WHERE id = :id');
         $stmt->execute([':id' => $id]);
     }
@@ -239,6 +246,9 @@ final class UseService
             if ($found === null) {
                 throw new ValidationException(['compound_id' => [DoseConfig::COMPOUND_UNKNOWN]]);
             }
+            if ($found['archived_at'] !== null) {
+                throw new ValidationException(['compound_id' => [DoseConfig::COMPOUND_ARCHIVED]]);
+            }
 
             return $found;
         }
@@ -269,6 +279,7 @@ final class UseService
             (float) $compound['bac_water_ml'],
             (float) $syringe['volume_ml'],
             (float) $syringe['capacity_iu'],
+            $this->compounds->adjustmentPeptideMg($pdo, (string) $compound['id']),
         );
         if (!$this->doses->exceedsRemainder($doseMg, $remainder->remainingMg)) {
             return;

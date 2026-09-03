@@ -55,6 +55,8 @@ class FieldParserTest extends TestCase
         $this->assertSame(3.0, FieldParser::from(['n' => 3])->requireFloat('n'));
         $this->assertSame(4.5, FieldParser::from(['n' => '4.5'])->requireFloat('n'));
         $this->assertSame(1.0, FieldParser::from(['n' => 1])->requirePositiveFloat('n'));
+        $this->assertSame(0.0, FieldParser::from(['n' => 0])->requireNonNegativeFloat('n'));
+        $this->assertSame(1.5, FieldParser::from(['n' => 1.5])->requireNonNegativeFloat('n'));
 
         try {
             FieldParser::from([])->requireFloat('n');
@@ -89,6 +91,13 @@ class FieldParserTest extends TestCase
             $this->fail('expected');
         } catch (ValidationException $e) {
             $this->assertSame(['n' => [DoseConfig::MUST_BE_POSITIVE]], $e->fields());
+        }
+
+        try {
+            FieldParser::from(['n' => -0.1])->requireNonNegativeFloat('n');
+            $this->fail('expected');
+        } catch (ValidationException $e) {
+            $this->assertSame(['n' => [DoseConfig::MUST_BE_NON_NEGATIVE]], $e->fields());
         }
 
         $this->assertSame(2.0, FieldParser::from(['n' => 2])->optionalFloat('n'));

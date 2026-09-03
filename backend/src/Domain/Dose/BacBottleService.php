@@ -27,8 +27,9 @@ final class BacBottleService
     {
         $currentId = $this->currentId($pdo);
         $stmt = $pdo->query(
-            'SELECT id, volume_ml, remaining_ml, opened_at, notes, created_at
+            'SELECT id, volume_ml, remaining_ml, opened_at, notes, created_at, archived_at
              FROM bac_bottles
+             WHERE archived_at IS NULL
              ORDER BY opened_at DESC, id DESC'
         );
         $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -142,6 +143,28 @@ final class BacBottleService
         return $this->get($pdo, $id);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function archive(PDO $pdo, string $id): array
+    {
+        $existing = $this->get($pdo, $id);
+        if ($existing['archived_at'] !== null) {
+            throw new ValidationException(['id' => [DoseConfig::ALREADY_ARCHIVED]], DoseConfig::ALREADY_ARCHIVED);
+        }
+        if (!$this->doses->isDepleted((float) $existing['remaining_ml'])) {
+            throw new ValidationException(['id' => [DoseConfig::ARCHIVE_NOT_EMPTY]], DoseConfig::ARCHIVE_NOT_EMPTY);
+        }
+
+        $stmt = $pdo->prepare('UPDATE bac_bottles SET archived_at = :archived_at WHERE id = :id');
+        $stmt->execute([
+            ':id' => $id,
+            ':archived_at' => $this->timestamp(),
+        ]);
+
+        return $this->get($pdo, $id);
+    }
+
     public function debitCurrent(PDO $pdo, float $ml): ?string
     {
         $row = $this->currentRow($pdo);
@@ -240,9 +263,9 @@ final class BacBottleService
     private function currentRow(PDO $pdo): ?array
     {
         $stmt = $pdo->query(
-            'SELECT id, volume_ml, remaining_ml, opened_at, notes, created_at
+            'SELECT id, volume_ml, remaining_ml, opened_at, notes, created_at, archived_at
              FROM bac_bottles
-             WHERE remaining_ml > 0
+             WHERE remaining_ml > 0 AND archived_at IS NULL
              ORDER BY opened_at DESC, id DESC
              LIMIT 1'
         );
@@ -257,7 +280,7 @@ final class BacBottleService
     private function findRow(PDO $pdo, string $id): ?array
     {
         $stmt = $pdo->prepare(
-            'SELECT id, volume_ml, remaining_ml, opened_at, notes, created_at
+            'SELECT id, volume_ml, remaining_ml, opened_at, notes, created_at, archived_at
              FROM bac_bottles
              WHERE id = :id'
         );
@@ -282,6 +305,9 @@ final class BacBottleService
             'opened_at' => (string) $row['opened_at'],
             'notes' => $row['notes'] === null ? null : (string) $row['notes'],
             'created_at' => (string) $row['created_at'],
+            'archived_at' => !isset($row['archived_at']) || $row['archived_at'] === null || $row['archived_at'] === ''
+                ? null
+                : (string) $row['archived_at'],
             'is_current' => $currentId !== null && $id === $currentId,
         ];
     }

@@ -1,0 +1,1 @@
+function t(n,r){return r>0?n/r:0}function i(n,r){const e=t(n,r);return n<=0||e<=0?"danger":e<=.2?"warning":"default"}function a(n){return n==="danger"?"Empty — add to inventory.":n==="warning"?"Low remainder.":null}function u(n){return n<=0}export{a,u as i,i as r};

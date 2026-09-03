@@ -7,12 +7,14 @@
   import { OFFLINE_SAVE_MESSAGE, saveWhileOnline } from '$lib/offline';
   import { firstFieldError, type FieldMap } from '$lib/payload';
   import {
+    archiveBacBottle,
     burnBacBottle,
     deleteBacBottle,
     fetchBacBottle,
     patchBacBottle,
     type BacBottle
   } from '$lib/inventory';
+  import { isDepleted } from '$lib/remainder';
 
   let bottle = $state<BacBottle | null>(null);
   let openedAt = $state('');
@@ -20,6 +22,7 @@
   let burnMl = $state('1');
   let pending = $state(false);
   let pendingBurn = $state(false);
+  let pendingArchive = $state(false);
   let deleting = $state(false);
   let fields = $state<FieldMap>({});
   let formError = $state('');
@@ -30,6 +33,8 @@
   const unused = $derived(
     bottle !== null && Math.abs(bottle.remaining_ml - bottle.volume_ml) < 1e-9
   );
+  const empty = $derived(bottle !== null && isDepleted(bottle.remaining_ml));
+  const archived = $derived(bottle !== null && bottle.archived_at !== null);
   const burnAmount = $derived(parseIuInput(burnMl));
 
   onMount(async () => {
@@ -99,6 +104,32 @@
     }
   }
 
+  async function onArchive() {
+    const target = bottle;
+    if (target === null || !empty || archived) {
+      return;
+    }
+    const ok = window.confirm('Hide this empty bottle from inventory?');
+    if (!ok) {
+      return;
+    }
+    pendingArchive = true;
+    formError = '';
+    toast = '';
+    try {
+      const result = await saveWhileOnline(() => archiveBacBottle(target.id));
+      pendingArchive = false;
+      if (result.ok) {
+        await goto('/inventory');
+        return;
+      }
+      formError = result.message;
+    } catch {
+      pendingArchive = false;
+      toast = OFFLINE_SAVE_MESSAGE;
+    }
+  }
+
   async function onDelete() {
     const target = bottle;
     if (target === null || !unused) {
@@ -160,8 +191,18 @@
       {#if burnMessage}
         <p class="field-error">{burnMessage}</p>
       {/if}
+    {:else if archived}
+      <p class="muted">This bottle is archived and hidden from inventory.</p>
     {:else}
       <p class="muted">This bottle is empty.</p>
+      <button
+        type="button"
+        class="secondary below-fold"
+        disabled={pendingBurn || pending || pendingArchive || deleting}
+        onclick={onArchive}
+      >
+        {pendingArchive ? 'Archiving…' : 'Archive empty bottle'}
+      </button>
     {/if}
 
     <label>
@@ -182,14 +223,14 @@
     {/if}
 
     <div class="sticky-cta">
-      <button type="submit" disabled={pending || deleting}>
+      <button type="submit" disabled={pending || pendingArchive || deleting}>
         {pending ? 'Saving…' : 'Save'}
       </button>
     </div>
   </form>
 
   {#if unused}
-    <button class="danger" type="button" disabled={pending || deleting} onclick={onDelete}>
+    <button class="danger" type="button" disabled={pending || pendingArchive || deleting} onclick={onDelete}>
       {deleting ? 'Deleting…' : 'Delete from inventory'}
     </button>
   {:else}

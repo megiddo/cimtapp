@@ -29,7 +29,7 @@ final class CompoundService
     public function list(PDO $pdo): array
     {
         $stmt = $pdo->query(
-            'SELECT * FROM compounds ORDER BY compounded_at DESC, id DESC'
+            'SELECT * FROM compounds WHERE archived_at IS NULL ORDER BY compounded_at DESC, id DESC'
         );
         $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
         $default = $this->syringes->defaultSyringe($pdo);
@@ -63,7 +63,7 @@ final class CompoundService
     public function listOpen(PDO $pdo): array
     {
         $stmt = $pdo->query(
-            'SELECT * FROM compounds WHERE is_open = 1 ORDER BY compounded_at DESC, id DESC'
+            'SELECT * FROM compounds WHERE is_open = 1 AND archived_at IS NULL ORDER BY compounded_at DESC, id DESC'
         );
         $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
         $default = $this->syringes->defaultSyringe($pdo);
@@ -134,6 +134,14 @@ final class CompoundService
             );
             $stmt->execute([':id' => $compoundId, ':exclude' => $excludeUseId]);
         }
+
+        return $this->doses->roundMg((float) $stmt->fetchColumn());
+    }
+
+    public function adjustmentPeptideMg(PDO $pdo, string $compoundId): float
+    {
+        $stmt = $pdo->prepare('SELECT COALESCE(SUM(delta_mg), 0) FROM compound_adjustments WHERE compound_id = :id');
+        $stmt->execute([':id' => $compoundId]);
 
         return $this->doses->roundMg((float) $stmt->fetchColumn());
     }
@@ -215,6 +223,9 @@ final class CompoundService
         $notes = $fields->has('notes') ? $fields->optionalString('notes') : $existing['notes'];
         $name = $this->vialName($fields, (string) $existing['peptide_type_name'], (string) $existing['name']);
         $isOpen = $this->vialOpen($fields, (bool) $existing['is_open']);
+        if ($isOpen && $existing['archived_at'] !== null) {
+            throw new ValidationException(['is_open' => [DoseConfig::COMPOUND_ARCHIVED]], DoseConfig::COMPOUND_ARCHIVED);
+        }
 
         $mixChanged = $this->doses->roundMg((float) $existing['peptide_mg']) !== $peptideMg
             || abs((float) $existing['bac_water_ml'] - $bacWaterMl) > 1e-9;
@@ -269,6 +280,77 @@ final class CompoundService
         return $this->get($pdo, $id);
     }
 
+    /**
+     * Sets remaining volume to a measured amount. Delta is stored as milligrams
+     * so later uses still compute remainder from the ledger.
+     *
+     * @return array<string, mixed>
+     */
+    public function adjust(PDO $pdo, string $id, FieldParser $fields): array
+    {
+        $existing = $this->get($pdo, $id);
+        if ($existing['archived_at'] !== null) {
+            throw new ValidationException(['id' => [DoseConfig::COMPOUND_ARCHIVED]], DoseConfig::COMPOUND_ARCHIVED);
+        }
+
+        $targetMl = $this->doses->roundVolume($fields->requireNonNegativeFloat('remaining_ml'));
+        $mixMl = (float) $existing['bac_water_ml'];
+        if ($targetMl - $mixMl > 1e-9) {
+            throw new ValidationException(
+                ['remaining_ml' => [DoseConfig::REMAINING_EXCEEDS_MIX]],
+                DoseConfig::REMAINING_EXCEEDS_MIX,
+            );
+        }
+
+        $concentration = (float) $existing['concentration'];
+        $targetMg = $this->doses->roundMg($targetMl * $concentration);
+        $deltaMg = $this->doses->roundMg($targetMg - (float) $existing['remaining_mg']);
+        if (abs($deltaMg) < 1e-9) {
+            return $existing;
+        }
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO compound_adjustments (id, compound_id, delta_mg, remaining_ml, notes, created_at)
+             VALUES (:id, :compound_id, :delta_mg, :remaining_ml, :notes, :created_at)'
+        );
+        $stmt->execute([
+            ':id' => $this->ids->uuid(),
+            ':compound_id' => $id,
+            ':delta_mg' => $deltaMg,
+            ':remaining_ml' => $targetMl,
+            ':notes' => $fields->optionalString('notes'),
+            ':created_at' => $this->timestamp(),
+        ]);
+
+        return $this->get($pdo, $id);
+    }
+
+    /**
+     * Hides an empty vial from inventory lists. Finding archived vials is later work.
+     *
+     * @return array<string, mixed>
+     */
+    public function archive(PDO $pdo, string $id): array
+    {
+        $existing = $this->get($pdo, $id);
+        if ($existing['archived_at'] !== null) {
+            throw new ValidationException(['id' => [DoseConfig::ALREADY_ARCHIVED]], DoseConfig::ALREADY_ARCHIVED);
+        }
+        if (!$this->doses->isDepleted((float) $existing['remaining_mg'])) {
+            throw new ValidationException(['id' => [DoseConfig::ARCHIVE_NOT_EMPTY]], DoseConfig::ARCHIVE_NOT_EMPTY);
+        }
+
+        $stmt = $pdo->prepare(
+            'UPDATE compounds SET archived_at = :archived_at, is_open = 0 WHERE id = :id'
+        );
+        $stmt->execute([
+            ':id' => $id,
+            ':archived_at' => $this->timestamp(),
+        ]);
+
+        return $this->get($pdo, $id);
+    }
+
     public function delete(PDO $pdo, string $id): void
     {
         $row = $this->findRow($pdo, $id);
@@ -292,7 +374,7 @@ final class CompoundService
     private function currentRow(PDO $pdo): ?array
     {
         $stmt = $pdo->query(
-            'SELECT * FROM compounds WHERE is_open = 1 ORDER BY compounded_at DESC, id DESC LIMIT 1'
+            'SELECT * FROM compounds WHERE is_open = 1 AND archived_at IS NULL ORDER BY compounded_at DESC, id DESC LIMIT 1'
         );
         $row = $stmt === false ? false : $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -321,18 +403,23 @@ final class CompoundService
         $id = (string) $row['id'];
         $peptideMg = (float) $row['peptide_mg'];
         $bacWaterMl = (float) $row['bac_water_ml'];
+        $adjustmentMg = $this->adjustmentPeptideMg($pdo, $id);
         $remainder = $this->doses->remaining(
             $peptideMg,
             $this->usedPeptideMg($pdo, $id),
             $bacWaterMl,
             (float) $syringe['volume_ml'],
             (float) $syringe['capacity_iu'],
+            $adjustmentMg,
         );
 
         return [
             'id' => $id,
             'name' => (string) $row['name'],
             'is_open' => (int) $row['is_open'] === 1,
+            'archived_at' => !isset($row['archived_at']) || $row['archived_at'] === null || $row['archived_at'] === ''
+                ? null
+                : (string) $row['archived_at'],
             'peptide_type_id' => (string) $row['peptide_type_id'],
             'peptide_type_slug' => (string) $row['peptide_type_slug'],
             'peptide_type_name' => (string) $row['peptide_type_name'],
@@ -343,6 +430,7 @@ final class CompoundService
             'created_at' => (string) $row['created_at'],
             'bac_bottle_id' => $row['bac_bottle_id'] === null ? null : (string) $row['bac_bottle_id'],
             'has_uses' => $this->hasUses($pdo, $id),
+            'adjustment_mg' => $adjustmentMg,
             'remaining_mg' => $remainder->remainingMg,
             'remaining_ml' => $remainder->remainingMl,
             'remaining_iu' => $remainder->remainingIu,
@@ -403,7 +491,8 @@ final class CompoundService
     private function assertMixFitsUses(PDO $pdo, string $compoundId, float $peptideMg, float $bacWaterMl): void
     {
         $used = $this->doses->roundMg($this->recalculatedUsedMg($pdo, $compoundId, $peptideMg, $bacWaterMl));
-        if (!$this->doses->exceedsRemainder($used, $peptideMg)) {
+        $netUsed = $this->doses->roundMg($used - $this->adjustmentPeptideMg($pdo, $compoundId));
+        if (!$this->doses->exceedsRemainder($netUsed, $peptideMg)) {
             return;
         }
 

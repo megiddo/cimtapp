@@ -49,15 +49,21 @@ final class DoseCalculator
         float $bacWaterMl,
         float $syringeVolumeMl,
         float $syringeCapacityIu,
+        float $adjustmentMg = 0.0,
     ): Remainder {
         $this->assertPositive($compoundPeptideMg, 'peptide_mg');
         $this->assertPositive($bacWaterMl, 'bac_water_ml');
         $concentration = $this->concentration($compoundPeptideMg, $bacWaterMl);
-        $remainingMg = $this->roundMg($compoundPeptideMg - $usedPeptideMgSum);
+        $remainingMg = $this->roundMg($compoundPeptideMg - $usedPeptideMgSum + $adjustmentMg);
         $remainingMl = $this->roundVolume($remainingMg / $concentration);
         $remainingIu = round($remainingMl / $this->mlPerIu($syringeVolumeMl, $syringeCapacityIu), DoseConfig::IU_DECIMALS);
 
         return new Remainder($remainingMg, $remainingMl, $remainingIu, $concentration);
+    }
+
+    public function isDepleted(float $remaining): bool
+    {
+        return $remaining <= 1e-9;
     }
 
     public function exceedsRemainder(float $doseMg, float $remainingMg): bool

@@ -30,6 +30,8 @@ final class DoseConfig
 
     public const MUST_BE_POSITIVE = 'Must be greater than 0.';
 
+    public const MUST_BE_NON_NEGATIVE = 'Must be 0 or greater.';
+
     public const MUST_BE_NUMBER = 'Enter a number greater than 0.';
 
     public const MUST_BE_TEXT = 'Must be text.';
@@ -73,6 +75,14 @@ final class DoseConfig
     public const COMPOUND_HAS_USES = 'This vial has logged uses and cannot be deleted.';
 
     public const COMPOUND_OVERDRAW = 'Existing uses would exceed this mix. Reduce those uses or increase peptide milligrams.';
+
+    public const COMPOUND_ARCHIVED = 'This vial is archived.';
+
+    public const ALREADY_ARCHIVED = 'Already archived.';
+
+    public const ARCHIVE_NOT_EMPTY = 'Archive is available when remaining is 0.';
+
+    public const REMAINING_EXCEEDS_MIX = 'Remaining cannot exceed the mix volume.';
 
     public const LIMIT_INVALID = 'Limit must be between 1 and 100.';
 

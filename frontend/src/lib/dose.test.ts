@@ -39,6 +39,9 @@ describe('dose formulas', () => {
     expect(remainder.remainingMl).toBe(1.75);
     expect(remainder.remainingIu).toBe(175);
     expect(remainder.concentration).toBe(5);
+    const adjusted = remainingFor(10, 1.25, 2, 0.5, 50, -1.25);
+    expect(adjusted.remainingMg).toBe(7.5);
+    expect(adjusted.remainingMl).toBe(1.5);
   });
 
   it('does not assume U-100 for a 1 mL / 40 IU syringe', () => {

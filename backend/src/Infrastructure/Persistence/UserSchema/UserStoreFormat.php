@@ -14,9 +14,10 @@ enum UserStoreFormat: int
     case V2BacAndSyringeStock = 2;
     case V3UserPeptideTypes = 3;
     case V4NamedOpenVials = 4;
+    case V5ArchiveAndAdjustments = 5;
 
     public static function current(): self
     {
-        return self::V4NamedOpenVials;
+        return self::V5ArchiveAndAdjustments;
     }
 }
