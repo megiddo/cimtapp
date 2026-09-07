@@ -11,6 +11,7 @@ use PDO;
 
 /**
  * Exclusive-lock, decrypt to DATA_DIR/tmp, run a callback, re-encrypt, unlock.
+ * The first schema mutation copies `{uuid}.sqlite.enc` to `{uuid}.sqlite.enc.bak`.
  */
 final class UserStore implements UserStorePort
 {
@@ -81,7 +82,8 @@ final class UserStore implements UserStorePort
             }
 
             try {
-                $this->userMigrator->migrate($plainPath);
+                $applied = $this->userMigrator->migrate($plainPath);
+                $this->snapshotEncIfNeeded($encPath, $userId, $applied);
                 $pdo = $this->openPdo($plainPath);
                 $result = $callback($pdo);
             } catch (\Throwable $e) {
@@ -126,6 +128,7 @@ final class UserStore implements UserStorePort
             try {
                 $this->crypto->decryptFile($encPath, $plainPath, $dek);
                 $applied = $this->userMigrator->migrate($plainPath);
+                $this->snapshotEncIfNeeded($encPath, $userId, $applied);
                 $bytes = file_get_contents($plainPath);
                 if (!is_string($bytes) || $bytes === '') {
                     throw new UserStoreException('Unable to export user store.');
@@ -142,6 +145,34 @@ final class UserStore implements UserStorePort
                 $this->shred($plainPath);
                 $this->unlinkIfExists($staging);
             }
+        });
+    }
+
+    public function hasPreMigrationBackup(string $userId): bool
+    {
+        $this->assertUserId($userId);
+
+        return is_file($this->paths->userEncBackup($userId));
+    }
+
+    /**
+     * Replace the live ciphertext with the pre-migration snapshot. The backup
+     * file is kept so restore can run again. The next unlock remigrates.
+     */
+    public function restorePreMigrationBackup(string $userId): void
+    {
+        $this->assertUserId($userId);
+        $this->paths->ensure();
+
+        $this->withLock($userId, function () use ($userId): void {
+            $bakPath = $this->paths->userEncBackup($userId);
+            if (!is_file($bakPath)) {
+                throw new UserStoreException('Pre-migration backup not found.');
+            }
+
+            $encPath = $this->paths->userEnc($userId);
+            $staging = $this->paths->userEncStaging($userId);
+            $this->copyAtomic($bakPath, $staging, $encPath, 'Failed to restore user store.');
         });
     }
 
@@ -196,6 +227,29 @@ final class UserStore implements UserStorePort
     {
         if (preg_match(self::USER_ID_PATTERN, $userId) !== 1) {
             throw new UserStoreException('User id must be a UUID.');
+        }
+    }
+
+    private function snapshotEncIfNeeded(string $encPath, string $userId, int $applied): void
+    {
+        if ($applied < 1 || !is_file($encPath)) {
+            return;
+        }
+
+        $bakPath = $this->paths->userEncBackup($userId);
+        if (is_file($bakPath)) {
+            return;
+        }
+
+        $staging = $this->paths->userEncBackupStaging($userId);
+        $this->copyAtomic($encPath, $staging, $bakPath, 'Failed to snapshot user store.');
+    }
+
+    private function copyAtomic(string $from, string $staging, string $to, string $failureMessage): void
+    {
+        if (!@copy($from, $staging) || !@rename($staging, $to)) {
+            $this->unlinkIfExists($staging);
+            throw new UserStoreException($failureMessage);
         }
     }
 

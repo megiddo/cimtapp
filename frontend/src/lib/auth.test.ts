@@ -10,6 +10,8 @@ import {
   submitCredentials,
   USER_EXPORT_FILENAME,
   downloadUserSqlite,
+  fetchStoreBackup,
+  restoreStoreBackup,
   triggerBlobDownload
 } from './auth';
 
@@ -202,6 +204,61 @@ describe('auth helpers', () => {
     await expect(downloadUserSqlite('', save)).resolves.toEqual({
       ok: false,
       message: 'Unable to download your data.'
+    });
+  });
+
+  it('reads store-backup availability and restores it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ statusCode: 200, data: { available: true } })
+      })
+    );
+    await expect(fetchStoreBackup()).resolves.toEqual({ available: true });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ statusCode: 200, data: { available: false } })
+      })
+    );
+    await expect(fetchStoreBackup()).resolves.toEqual({ available: false });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ statusCode: 200, data: {} })
+      })
+    );
+    await expect(fetchStoreBackup()).resolves.toEqual({ available: false });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ statusCode: 200, data: { ok: true } })
+      })
+    );
+    await expect(restoreStoreBackup()).resolves.toEqual({ ok: true });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: async () => ({ statusCode: 404, error: { type: 'RESOURCE_NOT_FOUND', description: '' } })
+      })
+    );
+    await expect(restoreStoreBackup()).resolves.toEqual({
+      ok: false,
+      message: 'Unable to restore the backup.'
     });
   });
 

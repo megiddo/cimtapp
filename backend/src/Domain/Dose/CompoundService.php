@@ -18,6 +18,7 @@ final class CompoundService
         private readonly UserPeptideService $peptides,
         private readonly SyringeService $syringes,
         private readonly BacBottleService $bacBottles,
+        private readonly ProfileService $profiles,
         private readonly IdGenerator $ids,
         private readonly Clock $clock,
     ) {
@@ -166,6 +167,10 @@ final class CompoundService
         $notes = $fields->optionalString('notes');
         $name = $this->vialName($fields, $peptide['name'], null);
         $isOpen = $this->vialOpen($fields, true);
+        $profileIds = $this->profileIdsForWrite($pdo, $fields, true);
+        if ($profileIds === null) {
+            $profileIds = [(string) $this->profiles->defaultProfile($pdo)['id']];
+        }
         $id = $this->ids->uuid();
         $now = $this->timestamp();
         $bottleId = $this->bacBottles->debitCurrent($pdo, $bacWaterMl);
@@ -195,6 +200,8 @@ final class CompoundService
             ':name' => $name,
             ':is_open' => $isOpen ? 1 : 0,
         ]);
+
+        $this->profiles->replaceCompoundProfiles($pdo, $id, $profileIds);
 
         return $this->get($pdo, $id);
     }
@@ -244,6 +251,7 @@ final class CompoundService
         }
 
         $peptide = $this->peptides->require($pdo, $peptideTypeId);
+        $profileIds = $this->profileIdsForWrite($pdo, $fields, false);
 
         $stmt = $pdo->prepare(
             'UPDATE compounds SET
@@ -275,6 +283,10 @@ final class CompoundService
 
         if ($mixChanged) {
             $this->syncUseDoses($pdo, $id, $peptideMg, $bacWaterMl);
+        }
+
+        if ($profileIds !== null) {
+            $this->profiles->replaceCompoundProfiles($pdo, $id, $profileIds);
         }
 
         return $this->get($pdo, $id);
@@ -364,6 +376,8 @@ final class CompoundService
         $bottleId = $row['bac_bottle_id'] === null ? null : (string) $row['bac_bottle_id'];
         $this->bacBottles->credit($pdo, $bottleId, (float) $row['bac_water_ml']);
 
+        $unlink = $pdo->prepare('DELETE FROM compound_profiles WHERE compound_id = :id');
+        $unlink->execute([':id' => $id]);
         $stmt = $pdo->prepare('DELETE FROM compounds WHERE id = :id');
         $stmt->execute([':id' => $id]);
     }
@@ -435,6 +449,7 @@ final class CompoundService
             'remaining_ml' => $remainder->remainingMl,
             'remaining_iu' => $remainder->remainingIu,
             'concentration' => $remainder->concentration,
+            'profile_ids' => $this->profiles->profileIdsForCompound($pdo, $id),
         ];
     }
 
@@ -455,6 +470,23 @@ final class CompoundService
             'compounded_at' => $presented['compounded_at'],
             'is_open' => $presented['is_open'],
         ];
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function profileIdsForWrite(PDO $pdo, FieldParser $fields, bool $create): ?array
+    {
+        $ids = $fields->optionalIdList('profile_ids');
+        if ($ids === null) {
+            if (!$create) {
+                return null;
+            }
+
+            return [(string) $this->profiles->defaultProfile($pdo)['id']];
+        }
+
+        return $this->profiles->requireIds($pdo, $ids);
     }
 
     private function vialName(FieldParser $fields, string $peptideName, ?string $existing): string

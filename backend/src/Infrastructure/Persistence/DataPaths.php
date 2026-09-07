@@ -58,6 +58,17 @@ final class DataPaths
         return $this->usersDir() . '/' . $userId . '.sqlite.enc.tmp';
     }
 
+    /** Ciphertext snapshot taken once, just before the first schema mutation. */
+    public function userEncBackup(string $userId): string
+    {
+        return $this->usersDir() . '/' . $userId . '.sqlite.enc.bak';
+    }
+
+    public function userEncBackupStaging(string $userId): string
+    {
+        return $this->usersDir() . '/' . $userId . '.sqlite.enc.bak.tmp';
+    }
+
     public function ensure(): void
     {
         $this->ensureDir($this->dataDir);

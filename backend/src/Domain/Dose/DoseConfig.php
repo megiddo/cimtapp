@@ -88,6 +88,28 @@ final class DoseConfig
 
     public const BEFORE_INVALID = 'before must be an ISO timestamp.';
 
+    public const PROFILE_DEFAULT_NAME = 'Default';
+
+    public const PROFILE_MAX = 5;
+
+    public const PROFILE_NAME_MAX = 40;
+
+    public const PROFILE_UNKNOWN = 'Profile not found.';
+
+    public const PROFILE_NAME_TOO_LONG = 'Use a name of 40 characters or fewer.';
+
+    public const PROFILE_LIMIT = 'You can add up to 4 additional profiles.';
+
+    public const PROFILE_DEFAULT_REQUIRED = 'Keep the default profile.';
+
+    public const PROFILE_HAS_USES = 'Move this profile’s uses before deleting it.';
+
+    public const PROFILE_VIAL_MISMATCH = 'This vial is not associated with that profile.';
+
+    public const MUST_BE_ID_LIST = 'Choose one or more profiles.';
+
+    public const PROFILE_REQUIRED = 'Choose at least one profile.';
+
     public static function overdraw(string $requestedIu, string $remainingIu): string
     {
         return $requestedIu . ' IU exceeds ' . $remainingIu . ' IU remaining in this vial.';

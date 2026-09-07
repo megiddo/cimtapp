@@ -169,4 +169,36 @@ class FieldParserTest extends TestCase
             $this->assertSame(['t' => [DoseConfig::MUST_BE_DATETIME]], $e->fields());
         }
     }
+
+    public function testOptionalIdList(): void
+    {
+        $this->assertNull(FieldParser::from([])->optionalIdList('profile_ids'));
+        $this->assertNull(FieldParser::from(['profile_ids' => null])->optionalIdList('profile_ids'));
+        $this->assertSame([], FieldParser::from(['profile_ids' => []])->optionalIdList('profile_ids'));
+        $this->assertSame(
+            ['a', 'b'],
+            FieldParser::from(['profile_ids' => [' a ', 'b', 'a']])->optionalIdList('profile_ids')
+        );
+
+        try {
+            FieldParser::from(['profile_ids' => 'a'])->optionalIdList('profile_ids');
+            $this->fail('expected');
+        } catch (ValidationException $e) {
+            $this->assertSame(['profile_ids' => [DoseConfig::MUST_BE_ID_LIST]], $e->fields());
+        }
+
+        try {
+            FieldParser::from(['profile_ids' => [1]])->optionalIdList('profile_ids');
+            $this->fail('expected');
+        } catch (ValidationException $e) {
+            $this->assertSame(['profile_ids' => [DoseConfig::MUST_BE_ID_LIST]], $e->fields());
+        }
+
+        try {
+            FieldParser::from(['profile_ids' => ['']])->optionalIdList('profile_ids');
+            $this->fail('expected');
+        } catch (ValidationException $e) {
+            $this->assertSame(['profile_ids' => [DoseConfig::MUST_BE_ID_LIST]], $e->fields());
+        }
+    }
 }

@@ -160,6 +160,33 @@ final class FieldParser
         return $value;
     }
 
+    /**
+     * @return list<string>|null
+     */
+    public function optionalIdList(string $key): ?array
+    {
+        if (!$this->has($key) || $this->data[$key] === null) {
+            return null;
+        }
+        $raw = $this->data[$key];
+        if (!is_array($raw)) {
+            throw new ValidationException([$key => [DoseConfig::MUST_BE_ID_LIST]]);
+        }
+        $ids = [];
+        foreach ($raw as $item) {
+            if (!is_string($item)) {
+                throw new ValidationException([$key => [DoseConfig::MUST_BE_ID_LIST]]);
+            }
+            $trimmed = trim($item);
+            if ($trimmed === '') {
+                throw new ValidationException([$key => [DoseConfig::MUST_BE_ID_LIST]]);
+            }
+            $ids[] = $trimmed;
+        }
+
+        return array_values(array_unique($ids));
+    }
+
     private function normalizeDatetime(string $key, string $value): string
     {
         $parsed = date_create($value);

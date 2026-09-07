@@ -48,11 +48,23 @@ export type Compound = {
   remaining_ml: number;
   remaining_iu: number;
   concentration: number;
+  profile_ids: string[];
 };
+
+export type Profile = {
+  id: string;
+  name: string;
+  is_default: boolean;
+  created_at: string;
+};
+
+export const PROFILE_MAX = 5;
 
 export type LoggedUse = {
   id: string;
   compound_id: string;
+  profile_id: string | null;
+  profile_name: string | null;
   compound_name: string;
   peptide_type_name: string;
   iu: number;
@@ -242,7 +254,7 @@ export async function deleteBacBottle(id: string, baseUrl = ''): Promise<DomainR
 }
 
 export async function fetchUses(
-  init: { limit?: number; before?: string; baseUrl?: string } = {}
+  init: { limit?: number; before?: string; profile_id?: string; baseUrl?: string } = {}
 ): Promise<LoggedUse[]> {
   const params = new URLSearchParams();
   if (init.limit !== undefined) {
@@ -250,6 +262,9 @@ export async function fetchUses(
   }
   if (init.before !== undefined) {
     params.set('before', init.before);
+  }
+  if (init.profile_id !== undefined) {
+    params.set('profile_id', init.profile_id);
   }
   const query = params.toString();
   const path = query === '' ? '/api/v1/uses' : `/api/v1/uses?${query}`;
@@ -274,6 +289,7 @@ export async function mixCompound(
     name?: string;
     is_open?: boolean;
     notes?: string | null;
+    profile_ids?: string[];
   },
   baseUrl = ''
 ): Promise<DomainResult<Compound>> {
@@ -296,6 +312,7 @@ export async function patchCompound(
     name?: string;
     is_open?: boolean;
     notes?: string | null;
+    profile_ids?: string[];
   },
   baseUrl = ''
 ): Promise<DomainResult<Compound>> {
@@ -355,6 +372,7 @@ export async function logUse(
     used_at?: string;
     notes?: string | null;
     compound_id?: string;
+    profile_id?: string;
   },
   baseUrl = ''
 ): Promise<DomainResult<LoggedUse>> {
@@ -374,6 +392,7 @@ export async function patchUse(
     syringe_id?: string | null;
     used_at?: string;
     notes?: string | null;
+    profile_id?: string;
   },
   baseUrl = ''
 ): Promise<DomainResult<LoggedUse>> {
@@ -477,6 +496,55 @@ export async function burnSyringe(
     body: JSON.stringify({ count })
   });
   return asResult(payload, 'Unable to burn syringes.');
+}
+
+export async function fetchProfiles(baseUrl = ''): Promise<Profile[]> {
+  const payload = await readAction<Profile[]>('/api/v1/profiles', { baseUrl });
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
+export async function createProfile(body: { name: string }, baseUrl = ''): Promise<DomainResult<Profile>> {
+  const payload = await readAction<Profile>('/api/v1/profiles', {
+    baseUrl,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return asResult(payload, 'Unable to add profile.');
+}
+
+export async function patchProfile(
+  id: string,
+  body: { name: string },
+  baseUrl = ''
+): Promise<DomainResult<Profile>> {
+  const payload = await readAction<Profile>(`/api/v1/profiles/${id}`, {
+    baseUrl,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return asResult(payload, 'Unable to rename profile.');
+}
+
+export async function deleteProfile(id: string, baseUrl = ''): Promise<DomainResult<null>> {
+  const payload = await readAction<null>(`/api/v1/profiles/${id}`, {
+    baseUrl,
+    method: 'DELETE'
+  });
+  if (payload.statusCode >= 200 && payload.statusCode < 300) {
+    return { ok: true, data: null, status: payload.statusCode };
+  }
+  return fail(
+    payload.statusCode,
+    fieldErrorsFrom(payload),
+    genericErrorMessage(payload, 'Unable to delete profile.'),
+    remainingIuFrom(payload)
+  );
+}
+
+export function vialsForProfile(vials: Compound[], profileId: string): Compound[] {
+  return vials.filter((vial) => (vial.profile_ids ?? []).includes(profileId));
 }
 
 export function parseCountInput(raw: string): number | null {

@@ -35,7 +35,14 @@ import {
   burnBacBottle,
   archiveBacBottle,
   archiveCompound,
-  adjustCompound
+  adjustCompound,
+  fetchProfiles,
+  createProfile,
+  patchProfile,
+  deleteProfile,
+  vialsForProfile,
+  PROFILE_MAX,
+  type Compound
 } from './inventory';
 
 function jsonResponse(status: number, body: unknown) {
@@ -542,5 +549,48 @@ describe('inventory API client', () => {
       )
     );
     await expect(archiveCompound('c1')).resolves.toMatchObject({ ok: false, status: 422 });
+  });
+
+  it('lists and mutates profiles and filters uses by profile', async () => {
+    expect(PROFILE_MAX).toBe(5);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          statusCode: 200,
+          data: [{ id: 'p1', name: 'Default', is_default: true, created_at: 'now' }]
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(201, {
+          statusCode: 201,
+          data: { id: 'p2', name: 'Sam', is_default: false, created_at: 'now' }
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          statusCode: 200,
+          data: { id: 'p2', name: 'Alex', is_default: false, created_at: 'now' }
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse(204, { statusCode: 204 }))
+      .mockResolvedValueOnce(jsonResponse(200, { statusCode: 200, data: [{ id: 'u1' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchProfiles()).resolves.toEqual([
+      { id: 'p1', name: 'Default', is_default: true, created_at: 'now' }
+    ]);
+    await expect(createProfile({ name: 'Sam' })).resolves.toMatchObject({ ok: true, status: 201 });
+    await expect(patchProfile('p2', { name: 'Alex' })).resolves.toMatchObject({ ok: true });
+    await expect(deleteProfile('p2')).resolves.toMatchObject({ ok: true, status: 204 });
+    await expect(fetchUses({ profile_id: 'p1', limit: 10 })).resolves.toEqual([{ id: 'u1' }]);
+    expect(String(fetchMock.mock.calls[4][0])).toContain('profile_id=p1');
+    expect(vialsForProfile(
+      [
+        { id: 'c1', profile_ids: ['p1'] },
+        { id: 'c2', profile_ids: ['p2'] }
+      ] as Compound[],
+      'p1'
+    ).map((item) => item.id)).toEqual(['c1']);
   });
 });

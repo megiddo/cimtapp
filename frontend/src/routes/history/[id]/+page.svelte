@@ -14,10 +14,12 @@
   import { toDatetimeLocalValue } from '$lib/datetime';
   import { OFFLINE_SAVE_MESSAGE, saveWhileOnline } from '$lib/offline';
   import { firstFieldError, type FieldMap } from '$lib/payload';
-  import { deleteUse, fetchSyringes, fetchUse, patchUse, type LoggedUse, type Syringe } from '$lib/inventory';
+  import { deleteUse, fetchProfiles, fetchSyringes, fetchUse, patchUse, type LoggedUse, type Profile, type Syringe } from '$lib/inventory';
 
   let original = $state<LoggedUse | null>(null);
   let syringes = $state<Syringe[]>([]);
+  let profiles = $state<Profile[]>([]);
+  let profileId = $state('');
   let iuText = $state('');
   let syringeId = $state('');
   let usedAt = $state('');
@@ -56,9 +58,11 @@
     }
     original = await fetchUse(id);
     syringes = await fetchSyringes();
+    profiles = await fetchProfiles();
     if (original !== null) {
       iuText = String(original.iu);
       syringeId = original.syringe_id ?? '';
+      profileId = original.profile_id ?? '';
       notes = original.notes ?? '';
       const parsed = new Date(original.used_at);
       usedAt = Number.isNaN(parsed.getTime()) ? original.used_at : toDatetimeLocalValue(parsed);
@@ -81,6 +85,7 @@
       const result = await saveWhileOnline(() =>
         patchUse(target.id, {
           iu,
+          profile_id: profileId === '' ? undefined : profileId,
           syringe_id: syringeId === '' ? null : syringeId,
           used_at: usedAt,
           notes: notes === '' ? null : notes
@@ -136,6 +141,20 @@
   <p>Use not found.</p>
 {:else}
   <form class="auth-form" onsubmit={onSubmit}>
+    {#if profiles.length > 0}
+      <label>
+        Profile
+        <select bind:value={profileId} disabled={pending || deleting}>
+          {#each profiles as profile (profile.id)}
+            <option value={profile.id}>{profile.name}</option>
+          {/each}
+        </select>
+        {#if firstFieldError(fields, 'profile_id')}
+          <span class="field-error">{firstFieldError(fields, 'profile_id')}</span>
+        {/if}
+      </label>
+    {/if}
+
     <label>
       IU
       <input inputmode="decimal" name="iu" bind:value={iuText} disabled={pending || deleting} />

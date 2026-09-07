@@ -21,6 +21,7 @@ final class UserSchemaVersionDetector
         '003_user_peptide_types.sql' => 3,
         '004_named_open_vials.sql' => 4,
         '005_archive_and_adjustments.sql' => 5,
+        '006_profiles.sql' => 6,
     ];
 
     public function detect(PDO $pdo): int
@@ -89,6 +90,9 @@ final class UserSchemaVersionDetector
 
     private function fromSchemaShape(PDO $pdo): int
     {
+        if ($this->tableExists($pdo, 'profiles')) {
+            return UserStoreFormat::V6Profiles->value;
+        }
         if ($this->tableExists($pdo, 'compound_adjustments') || $this->hasColumn($pdo, 'compounds', 'archived_at')) {
             return UserStoreFormat::V5ArchiveAndAdjustments->value;
         }

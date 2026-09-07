@@ -33,7 +33,7 @@ Request unlock path: session cookie → user row + encrypted DEK → unwrap DEK 
 
 Boot (`App\Application\Boot\BootServices`): `GlobalMigrator` applies `backend/migrations/global/*.sql` onto `{DATA_DIR}/global.sqlite` (creates the dir if missing). Second boot is a no-op via `schema_migrations`. Peptide seed is `INSERT OR IGNORE`.
 
-Open a user store: inject `App\Infrastructure\Persistence\UserStore`, unwrap the DEK with `Crypto`, then `UserStore::withUnlocked($userId, $dek, function (PDO $pdo) { ... })`. `create($userId, $dek)` applies user-schema **strategies** (`App\Infrastructure\Persistence\UserSchema`) to a fresh sqlite up to `UserStoreFormat::current()`, encrypts, and writes `{DATA_DIR}/users/{uuid}.sqlite.enc`. Unlock and `GET /me/export` detect prior format versions (`user_store_format`, legacy `schema_migrations` filenames, or table shape) and mutate forward. Export returns decrypted plaintext sqlite (`SQLite format 3`) after those mutations. Lock timeout throws `UserStoreLockedException` (HTTP 503). Plaintext files live only under `{DATA_DIR}/tmp/` for the duration of the callback.
+Open a user store: inject `App\Infrastructure\Persistence\UserStore`, unwrap the DEK with `Crypto`, then `UserStore::withUnlocked($userId, $dek, function (PDO $pdo) { ... })`. `create($userId, $dek)` applies user-schema **strategies** (`App\Infrastructure\Persistence\UserSchema`) to a fresh sqlite up to `UserStoreFormat::current()`, encrypts, and writes `{DATA_DIR}/users/{uuid}.sqlite.enc`. Unlock and `GET /me/export` detect prior format versions (`user_store_format`, legacy `schema_migrations` filenames, or table shape) and mutate forward. The first mutation copies the pre-change ciphertext to `{uuid}.sqlite.enc.bak` (kept on restore so unlock can remigrate). Export returns decrypted plaintext sqlite (`SQLite format 3`) after those mutations. Lock timeout throws `UserStoreLockedException` (HTTP 503). Plaintext files live only under `{DATA_DIR}/tmp/` for the duration of the callback.
 
 Future (not v1): wrap DEK with Argon2id from the user password for password-only zero-knowledge. Google accounts cannot use that model without a recovery secret.
 
@@ -132,6 +132,8 @@ Success bodies stay `{ "statusCode": 201, "data": { ... } }`. `GET /me` data is 
 | GET | `/me` | identity + remainder summary (auth) |
 | POST | `/me/password` | set or change password (auth) |
 | GET | `/me/export` | authenticated **decrypted** sqlite download (`application/octet-stream`); schema mutated to current format; temp file shredded |
+| GET | `/me/store-backup` | `{ available }` — whether `{uuid}.sqlite.enc.bak` exists |
+| POST | `/me/store-backup/restore` | replace live `.enc` with `.bak` (ciphertext only; next unlock remigrates); **404** if none |
 | GET | `/peptide-types` | global catalog, active only, `sort_order` (`id` = slug) |
 | GET/POST | `/syringes` | list / create (`volume_ml` > 0, `capacity_iu` > 0; auto label `0.5 mL / 50 IU` if omitted; exactly one `is_default`) |
 | PATCH | `/syringes/{id}` | label and/or default flag (setting default unsets others) |

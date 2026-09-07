@@ -12,14 +12,18 @@
     deleteCompound,
     fetchCompound,
     fetchPeptideTypes,
+    fetchProfiles,
     patchCompound,
     type Compound,
-    type PeptideType
+    type PeptideType,
+    type Profile
   } from '$lib/inventory';
   import { isDepleted } from '$lib/remainder';
 
   let compound = $state<Compound | null>(null);
   let peptides = $state<PeptideType[]>([]);
+  let profiles = $state<Profile[]>([]);
+  let selectedProfileIds = $state<string[]>([]);
   let peptideTypeId = $state('');
   let vialName = $state('');
   let openState = $state('1');
@@ -48,6 +52,7 @@
   onMount(async () => {
     const id = page.params.id;
     peptides = await fetchPeptideTypes();
+    profiles = await fetchProfiles();
     if (id === undefined) {
       loaded = true;
       return;
@@ -61,6 +66,7 @@
       bacWaterMl = String(compound.bac_water_ml);
       remainingMl = String(compound.remaining_ml);
       notes = compound.notes ?? '';
+      selectedProfileIds = [...(compound.profile_ids ?? [])];
       const parsed = new Date(compound.compounded_at);
       compoundedAt = Number.isNaN(parsed.getTime())
         ? compound.compounded_at
@@ -69,10 +75,18 @@
     loaded = true;
   });
 
+  function toggleProfile(id: string) {
+    if (selectedProfileIds.includes(id)) {
+      selectedProfileIds = selectedProfileIds.filter((item) => item !== id);
+      return;
+    }
+    selectedProfileIds = [...selectedProfileIds, id];
+  }
+
   async function onSubmit(event: SubmitEvent) {
     event.preventDefault();
     const target = compound;
-    if (target === null || mg === null || bac === null || peptideTypeId === '') {
+    if (target === null || mg === null || bac === null || peptideTypeId === '' || selectedProfileIds.length === 0) {
       return;
     }
     if (conc !== null && unusualConcentration(conc)) {
@@ -96,7 +110,8 @@
           peptide_mg: mg,
           bac_water_ml: bac,
           compounded_at: compoundedAt,
-          notes: notes === '' ? null : notes
+          notes: notes === '' ? null : notes,
+          profile_ids: selectedProfileIds
         })
       );
       pending = false;
@@ -293,12 +308,29 @@
       <input type="text" bind:value={notes} />
     </label>
 
-    {#if formError && !firstFieldError(fields, 'peptide_type_id') && !firstFieldError(fields, 'peptide_mg') && !firstFieldError(fields, 'bac_water_ml') && !firstFieldError(fields, 'name')}
+    <fieldset class="check-list">
+      <legend>Profiles</legend>
+      {#each profiles as profile (profile.id)}
+        <label class="check-row">
+          <input
+            type="checkbox"
+            checked={selectedProfileIds.includes(profile.id)}
+            onchange={() => toggleProfile(profile.id)}
+          />
+          <span>{profile.name}{profile.is_default ? ' (default)' : ''}</span>
+        </label>
+      {/each}
+      {#if firstFieldError(fields, 'profile_ids')}
+        <span class="field-error">{firstFieldError(fields, 'profile_ids')}</span>
+      {/if}
+    </fieldset>
+
+    {#if formError && !firstFieldError(fields, 'peptide_type_id') && !firstFieldError(fields, 'peptide_mg') && !firstFieldError(fields, 'bac_water_ml') && !firstFieldError(fields, 'name') && !firstFieldError(fields, 'profile_ids')}
       <p class="field-error" role="alert">{formError}</p>
     {/if}
 
     <div class="sticky-cta">
-      <button type="submit" disabled={pending || pendingAdjust || pendingArchive || deleting || mg === null || bac === null}>
+      <button type="submit" disabled={pending || pendingAdjust || pendingArchive || deleting || mg === null || bac === null || selectedProfileIds.length === 0}>
         {pending ? 'Saving…' : 'Save'}
       </button>
     </div>

@@ -26,6 +26,7 @@ final class UserSchemaCatalog
             new AddUserPeptideTypes($dir),
             new AddNamedOpenVials($dir),
             new AddArchiveAndAdjustments($dir),
+            new AddProfiles($dir),
         ]));
     }
 

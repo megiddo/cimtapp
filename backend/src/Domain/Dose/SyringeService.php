@@ -87,20 +87,32 @@ final class SyringeService
      *
      * @return array<string, mixed>
      */
-    public function syringeForNewUse(PDO $pdo, ?string $syringeId): array
+    public function syringeForNewUse(PDO $pdo, ?string $syringeId, ?string $profileId = null): array
     {
         if ($syringeId !== null) {
             return $this->get($pdo, $syringeId);
         }
 
-        $stmt = $pdo->query(
-            'SELECT syringe_id
-             FROM uses
-             WHERE syringe_id IS NOT NULL
-             ORDER BY used_at DESC, id DESC
-             LIMIT 1'
-        );
-        $lastId = $stmt === false ? false : $stmt->fetchColumn();
+        if ($profileId !== null) {
+            $stmt = $pdo->prepare(
+                'SELECT syringe_id
+                 FROM uses
+                 WHERE syringe_id IS NOT NULL AND profile_id = :profile_id
+                 ORDER BY used_at DESC, id DESC
+                 LIMIT 1'
+            );
+            $stmt->execute([':profile_id' => $profileId]);
+            $lastId = $stmt->fetchColumn();
+        } else {
+            $stmt = $pdo->query(
+                'SELECT syringe_id
+                 FROM uses
+                 WHERE syringe_id IS NOT NULL
+                 ORDER BY used_at DESC, id DESC
+                 LIMIT 1'
+            );
+            $lastId = $stmt === false ? false : $stmt->fetchColumn();
+        }
         if (is_string($lastId) && $lastId !== '') {
             $existing = $this->find($pdo, $lastId);
             if ($existing !== null) {
