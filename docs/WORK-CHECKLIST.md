@@ -65,3 +65,7 @@ Gate: usable one-handed on iPhone SE-width Safari with empty/error states; tests
 
 v1 is complete. Out of scope remains: new peptide types, household sharing, zero-knowledge keys, charts, CSV, reminders.
 
+## Next — v0.3
+
+Plan (not shipped): [v0.3.md](v0.3.md) — testing floors 90% / 80%, frontend and backend pattern splits, inventory open/archived + full lists.
+

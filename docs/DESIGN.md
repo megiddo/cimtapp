@@ -2,6 +2,8 @@
 
 Condensed from the design canvas so later agents do not need it. Product: a personal compounding log for incretin mimetics.
 
+Planned follow-on (not current behavior): [v0.3.md](v0.3.md).
+
 ## Stack
 
 | Layer | Choice | Notes |
