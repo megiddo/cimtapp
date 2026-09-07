@@ -454,6 +454,25 @@ a.card:focus-visible {
   color: #555;
 }
 
+.inventory-full-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stock-group {
+  margin-bottom: 0.5rem;
+}
+
+.full-list-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-weight: 650;
+  color: var(--accent);
+  text-decoration: none;
+}
+
 .sticky-cta {
   position: fixed;
   left: 50%;

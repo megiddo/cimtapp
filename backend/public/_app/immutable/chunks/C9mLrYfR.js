@@ -1,0 +1,1 @@
+function n(o){return o.trim().toLowerCase()}function t(o){if(typeof o!="object"||o===null)return!1;const e=o;return typeof e.email=="string"&&typeof e.has_password=="boolean"&&typeof e.has_google=="boolean"&&!("encrypted_dek"in e)&&!("dek_nonce"in e)&&!("dek"in e)}export{t as i,n};

@@ -13,7 +13,7 @@
     waterNeededPerBottle
   } from '$lib/dose';
   import { nowDatetimeLocal } from '$lib/datetime';
-  import { firstFieldError, type FieldMap } from '$lib/payload';
+  import { type FieldMap } from '$lib/payload';
   import {
     defaultSyringeId,
     fetchCurrentBacBottle,
@@ -26,6 +26,9 @@
     type Profile,
     type Syringe
   } from '$lib/inventory';
+  import ModalSheet from '$lib/ui/ModalSheet.svelte';
+  import ProfileMultiSelect from '$lib/ui/ProfileMultiSelect.svelte';
+  import VialMixFields from '$lib/ui/VialMixFields.svelte';
 
   let peptides = $state<PeptideType[]>([]);
   let syringes = $state<Syringe[]>([]);
@@ -194,81 +197,28 @@
   <p class="muted">Loading…</p>
 {:else}
   <form class="auth-form" onsubmit={onSubmit}>
-    <label>
-      Peptide
-      <select bind:value={peptideTypeId} onchange={onPeptideChange}>
-        {#each peptides as peptide (peptide.id)}
-          <option value={peptide.id}>{peptide.name}</option>
-        {/each}
-      </select>
-      {#if firstFieldError(fields, 'peptide_type_id')}
-        <span class="field-error">{firstFieldError(fields, 'peptide_type_id')}</span>
-      {/if}
-    </label>
+    <VialMixFields
+      {peptides}
+      bind:peptideTypeId
+      bind:vialName
+      bind:peptideMg
+      bind:bacWaterMl
+      bind:compoundedAt
+      bind:notes
+      {fields}
+      {conc}
+      bacHint={bacBottle
+        ? `${formatMl(bacBottle.remaining_ml)} mL remaining in current bottle`
+        : 'Optional: add a BAC bottle to track remaining water.'}
+      onpeptidechange={onPeptideChange}
+    />
     <a class="chip" href="/inventory/peptides/new">Add peptide</a>
-
-    <label>
-      Vial name
-      <input type="text" bind:value={vialName} maxlength="80" />
-      {#if firstFieldError(fields, 'name')}
-        <span class="field-error">{firstFieldError(fields, 'name')}</span>
-      {/if}
-    </label>
-
-    <label>
-      Peptide mg
-      <input inputmode="decimal" bind:value={peptideMg} />
-      {#if firstFieldError(fields, 'peptide_mg')}
-        <span class="field-error">{firstFieldError(fields, 'peptide_mg')}</span>
-      {/if}
-    </label>
-
-    <label>
-      BAC water mL
-      <input inputmode="decimal" bind:value={bacWaterMl} />
-      {#if conc !== null}
-        <span class="muted">{formatConcentration(conc)}</span>
-      {/if}
-      {#if bacBottle}
-        <span class="muted">{formatMl(bacBottle.remaining_ml)} mL remaining in current bottle</span>
-      {:else}
-        <span class="muted">Optional: add a BAC bottle to track remaining water.</span>
-      {/if}
-      {#if firstFieldError(fields, 'bac_water_ml')}
-        <span class="field-error">{firstFieldError(fields, 'bac_water_ml')}</span>
-      {/if}
-    </label>
     <button type="button" class="chip" onclick={openCalc}>Calculate water needed</button>
     {#if !bacBottle}
       <a class="chip" href="/inventory/water/new">Add BAC bottle</a>
     {/if}
 
-    <label>
-      Mixed at
-      <input type="datetime-local" bind:value={compoundedAt} />
-    </label>
-
-    <label>
-      Notes
-      <input type="text" bind:value={notes} />
-    </label>
-
-    <fieldset class="check-list">
-      <legend>Profiles</legend>
-      {#each profiles as profile (profile.id)}
-        <label class="check-row">
-          <input
-            type="checkbox"
-            checked={selectedProfileIds.includes(profile.id)}
-            onchange={() => toggleProfile(profile.id)}
-          />
-          <span>{profile.name}{profile.is_default ? ' (default)' : ''}</span>
-        </label>
-      {/each}
-      {#if firstFieldError(fields, 'profile_ids')}
-        <span class="field-error">{firstFieldError(fields, 'profile_ids')}</span>
-      {/if}
-    </fieldset>
+    <ProfileMultiSelect {profiles} selectedIds={selectedProfileIds} {fields} ontoggle={toggleProfile} />
 
     <div class="sticky-cta">
       <button type="submit" disabled={pending || mg === null || bac === null || selectedProfileIds.length === 0}>{pending ? 'Adding…' : 'Add to Inventory'}</button>
@@ -277,10 +227,7 @@
 {/if}
 
 {#if calcOpen}
-  <div class="modal-backdrop">
-    <button type="button" class="modal-backdrop-hit" aria-label="Close" onclick={closeCalc}></button>
-    <div class="modal-sheet calculator" role="dialog" aria-modal="true" aria-labelledby="pepcalc-title" tabindex="-1">
-      <h2 id="pepcalc-title" class="day-heading">Peptide calculator</h2>
+  <ModalSheet title="Peptide calculator" titleId="pepcalc-title" extraClass="calculator" onclose={closeCalc}>
       <p class="muted">Calculate the exact amount of bacteriostatic water needed.</p>
 
       <form class="auth-form" onsubmit={(event) => { event.preventDefault(); applyMix(); }}>
@@ -339,6 +286,5 @@
         {/if}
         <button type="button" class="secondary" onclick={closeCalc}>Cancel</button>
       </form>
-    </div>
-  </div>
+  </ModalSheet>
 {/if}

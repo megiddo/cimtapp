@@ -2,8 +2,9 @@
   import { goto } from '$app/navigation';
   import { parseIuInput } from '$lib/dose';
   import { nowDatetimeLocal } from '$lib/datetime';
-  import { firstFieldError, type FieldMap } from '$lib/payload';
+  import { type FieldMap } from '$lib/payload';
   import { addBacBottle } from '$lib/inventory';
+  import BacBottleFields from '$lib/ui/BacBottleFields.svelte';
 
   let volumeMl = $state('10');
   let openedAt = $state(nowDatetimeLocal());
@@ -35,23 +36,7 @@
 </script>
 
 <form class="auth-form" onsubmit={onSubmit}>
-  <label>
-    Bottle size mL
-    <input inputmode="decimal" bind:value={volumeMl} />
-    {#if firstFieldError(fields, 'volume_ml')}
-      <span class="field-error">{firstFieldError(fields, 'volume_ml')}</span>
-    {/if}
-  </label>
-
-  <label>
-    Opened at
-    <input type="datetime-local" bind:value={openedAt} />
-  </label>
-
-  <label>
-    Notes
-    <input type="text" bind:value={notes} />
-  </label>
+  <BacBottleFields bind:volumeMl bind:openedAt bind:notes {fields} />
 
   <div class="sticky-cta">
     <button type="submit" disabled={pending || volume === null || volume <= 0}>

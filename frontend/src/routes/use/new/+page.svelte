@@ -11,26 +11,24 @@
     FALLBACK_SYRINGE_VOLUME_ML
   } from '$lib/dose';
   import { nowDatetimeLocal } from '$lib/datetime';
-  import { OFFLINE_SAVE_MESSAGE, saveWhileOnline } from '$lib/offline';
   import { firstFieldError, type FieldMap } from '$lib/payload';
   import {
-    defaultOpenVialId,
-    defaultSyringeId,
     fetchOpenCompounds,
     fetchProfiles,
     fetchSyringes,
     fetchUses,
     logUse,
     vialLabel,
-    vialsForProfile,
     type Compound,
     type Profile,
     type Syringe
   } from '$lib/inventory';
+  import { canSubmitDose, initialLogStep, readLogSeed, seedDoseForProfile, type LogStep } from '$lib/log/logUseVm';
+  import { runDomainMutation } from '$lib/mutations/runDomainMutation';
 
   let profiles = $state<Profile[]>([]);
   let profileId = $state('');
-  let step = $state<'pick' | 'dose'>('pick');
+  let step = $state<LogStep>('pick');
   let openVials = $state<Compound[]>([]);
   let vials = $state<Compound[]>([]);
   let compoundId = $state('');
@@ -60,72 +58,69 @@
         )
       : null
   );
+  const canSave = $derived(canSubmitDose(selected, iu, profileId));
 
   onMount(async () => {
     profiles = await fetchProfiles();
     openVials = await fetchOpenCompounds();
     syringes = await fetchSyringes();
-    const requestedProfile = page.url.searchParams.get('profile_id');
-    if (profiles.length === 1) {
-      await selectProfile(profiles[0].id);
-    } else if (requestedProfile !== null && profiles.some((item) => item.id === requestedProfile)) {
-      await selectProfile(requestedProfile);
+    const seed = readLogSeed(page.url.searchParams);
+    const start = initialLogStep(profiles, seed.requestedProfileId);
+    if (start.step === 'dose' && start.profileId !== '') {
+      await selectProfile(start.profileId);
     }
     loaded = true;
   });
 
   async function selectProfile(id: string) {
-    profileId = id;
-    vials = vialsForProfile(openVials, id);
-    const requestedIu = page.url.searchParams.get('iu');
+    const seed = readLogSeed(page.url.searchParams);
     const recent = await fetchUses({ profile_id: id, limit: 1 });
-    const last = recent[0];
-    compoundId = defaultOpenVialId(
-      vials,
-      page.url.searchParams.get('compound_id') ?? last?.compound_id ?? null
-    );
-    syringeId = defaultSyringeId(syringes, last?.syringe_id ?? null);
-    if (requestedIu !== null && requestedIu !== '') {
-      iuText = requestedIu;
-    } else if (last !== undefined) {
-      iuText = String(last.iu);
-    } else {
-      iuText = '25';
-    }
+    const seeded = seedDoseForProfile({
+      profileId: id,
+      openVials,
+      syringes,
+      lastUse: recent[0],
+      requestedCompoundId: seed.requestedCompoundId,
+      requestedIu: seed.requestedIu
+    });
+    profileId = seeded.profileId;
+    vials = seeded.vials;
+    compoundId = seeded.compoundId;
+    syringeId = seeded.syringeId;
+    iuText = seeded.iuText;
     step = 'dose';
   }
 
   async function onSubmit(event: SubmitEvent) {
     event.preventDefault();
-    if (selected === null || iu === null || profileId === '') {
+    if (!canSave || selected === null || iu === null) {
       return;
     }
     pending = true;
     fields = {};
     toast = '';
     iuError = '';
-    try {
-      const result = await saveWhileOnline(() =>
-        logUse({
-          iu,
-          profile_id: profileId,
-          compound_id: selected.id,
-          syringe_id: syringeId === '' ? null : syringeId,
-          used_at: usedAt,
-          notes: notes === '' ? null : notes
-        })
-      );
-      pending = false;
-      if (result.ok) {
-        await goto('/');
-        return;
-      }
-      fields = result.fields;
-      iuError = firstFieldError(result.fields, 'iu') ?? result.message;
-    } catch {
-      pending = false;
-      toast = OFFLINE_SAVE_MESSAGE;
+    const outcome = await runDomainMutation(() =>
+      logUse({
+        iu,
+        profile_id: profileId,
+        compound_id: selected.id,
+        syringe_id: syringeId === '' ? null : syringeId,
+        used_at: usedAt,
+        notes: notes === '' ? null : notes
+      })
+    );
+    pending = false;
+    if (outcome.kind === 'ok') {
+      await goto('/');
+      return;
     }
+    if (outcome.kind === 'offline') {
+      toast = outcome.message;
+      return;
+    }
+    fields = outcome.fields;
+    iuError = firstFieldError(outcome.fields, 'iu') ?? outcome.message;
   }
 </script>
 
@@ -228,7 +223,7 @@
     </div>
 
     <div class="sticky-cta">
-      <button type="submit" disabled={pending || !loaded || iu === null || selected === null}>{pending ? 'Saving…' : 'Save'}</button>
+      <button type="submit" disabled={pending || !loaded || !canSave}>{pending ? 'Saving…' : 'Save'}</button>
     </div>
   </form>
 {/if}

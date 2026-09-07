@@ -78,6 +78,9 @@ describe('isTabActive', () => {
     expect(isTabActive('/use/new', '/use/new')).toBe(true);
     expect(isTabActive('/inventory', '/inventory')).toBe(true);
     expect(isTabActive('/inventory/new', '/inventory')).toBe(true);
+    expect(isTabActive('/inventory/vials', '/inventory')).toBe(true);
+    expect(isTabActive('/inventory/water', '/inventory')).toBe(true);
+    expect(isTabActive('/inventory/syringes', '/inventory')).toBe(true);
     expect(isTabActive('/inventory/abc', '/inventory')).toBe(true);
     expect(isTabActive('/history/edit', '/history')).toBe(true);
     expect(isTabActive('/inventory', '/history')).toBe(false);
@@ -98,6 +101,9 @@ describe('titleForPath', () => {
     expect(titleForPath('/inventory/syringes/new')).toBe('Add syringe');
     expect(titleForPath('/inventory/syringes/abc')).toBe('Edit');
     expect(titleForPath('/inventory/peptides/new')).toBe('Add peptide');
+    expect(titleForPath('/inventory/vials')).toBe('Vials');
+    expect(titleForPath('/inventory/water')).toBe('BAC');
+    expect(titleForPath('/inventory/syringes')).toBe('Syringes');
     expect(titleForPath('/inventory/abc')).toBe('Edit');
     expect(titleForPath('/history')).toBe('History');
     expect(titleForPath('/history/1')).toBe('Edit');
@@ -127,6 +133,9 @@ describe('backHrefForPath', () => {
     expect(backHrefForPath('/inventory/syringes/new')).toBe('/inventory');
     expect(backHrefForPath('/inventory/syringes/abc')).toBe('/inventory');
     expect(backHrefForPath('/inventory/peptides/new')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/vials')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/water')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/syringes')).toBe('/inventory');
     expect(backHrefForPath('/inventory/abc')).toBe('/inventory');
     expect(backHrefForPath('/history/abc')).toBe('/history');
     expect(backHrefForPath('/history')).toBeNull();
@@ -153,6 +162,9 @@ describe('needsStickyCta', () => {
     expect(needsStickyCta('/inventory/syringes/new')).toBe(true);
     expect(needsStickyCta('/inventory/syringes/abc')).toBe(true);
     expect(needsStickyCta('/inventory/peptides/new')).toBe(true);
+    expect(needsStickyCta('/inventory/vials')).toBe(false);
+    expect(needsStickyCta('/inventory/water')).toBe(false);
+    expect(needsStickyCta('/inventory/syringes')).toBe(false);
     expect(needsStickyCta('/inventory/abc')).toBe(true);
     expect(needsStickyCta('/history/abc')).toBe(true);
     expect(needsStickyCta('/history')).toBe(false);

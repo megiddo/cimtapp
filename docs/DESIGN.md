@@ -85,7 +85,7 @@ Each user sqlite includes an `account` snapshot (email, password hash, google_su
 - `uses`: id, compound_id, iu, syringe snapshots, volume_ml, peptide_mg, used_at, notes, created_at/updated_at
 - `user_store_format`: single-row integer format version (strategy migrations)
 
-Open stock is anything with `archived_at` null (vials, BAC, syringes). Home and Log list **open** vials by **name + peptide**. `GET /compounds/current` is the latest open `compounded_at`. Empty open items stay on the sheet until an explicit archive (remaining must be 0). `is_open` is no longer a separate close-without-archive state; PATCH/create ignore it. Remaining volume is computed from uses plus `compound_adjustments`. Compounds stay editable after uses; changing `peptide_mg` or `bac_water_ml` recalculates stored use milligrams. Delete is allowed only when the vial has no uses.
+Open stock is anything with `archived_at` null (vials, BAC, syringes). The inventory **sheet** (`/inventory`) shows open items only. Full lists (`/inventory/vials`, `/inventory/water`, `/inventory/syringes`) show **Open** then **Archived**; archived rows still link to the existing edit routes. Home and Log list **open** vials by **name + peptide**. `GET /compounds/current` is the latest open `compounded_at`. Empty open items stay on the sheet until an explicit archive (remaining must be 0). `is_open` is no longer a separate close-without-archive state; PATCH/create ignore it. Remaining volume is computed from uses plus `compound_adjustments`. Compounds stay editable after uses; changing `peptide_mg` or `bac_water_ml` recalculates stored use milligrams. Delete is allowed only when the vial has no uses.
 
 ## API (`/api/v1`, JSON, cookie auth)
 
@@ -204,7 +204,7 @@ Authenticated chrome: thin top bar + fixed bottom tabs. Login (`/login`) has no 
 | --- | --- | --- |
 | Home | `/` | Remainder hero, last few uses |
 | Log | `/use/new` | Center tab — IU field, sticky Save |
-| Inventory | `/inventory` | Mixes with remaining mg/mL; Add is `/inventory/new` |
+| Inventory | `/inventory` | **Open** vials, BAC, and syringes only. Each heading has a **Full list** link to `/inventory/vials`, `/inventory/water`, or `/inventory/syringes` (Open then Archived). Add is `/inventory/new`. |
 | History | `/history` | Uses newest first; tap to edit or delete |
 
 Login has no tabs. Settings is `/settings` from the Home gear. Copy voice: clinical and short.
