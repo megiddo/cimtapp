@@ -23,6 +23,7 @@ use App\Domain\Dose\BacBottleService;
 use App\Domain\Dose\CompoundService;
 use App\Domain\Dose\DoseCalculator;
 use App\Domain\Dose\PeptideCatalog;
+use App\Domain\Dose\ProfileService;
 use App\Domain\Dose\UserPeptideService;
 use App\Domain\Dose\SyringeService;
 use App\Domain\Dose\UseService;
@@ -116,12 +117,19 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(Clock::class),
             );
         },
+        ProfileService::class => static function (ContainerInterface $c): ProfileService {
+            return new ProfileService(
+                $c->get(IdGenerator::class),
+                $c->get(Clock::class),
+            );
+        },
         CompoundService::class => static function (ContainerInterface $c): CompoundService {
             return new CompoundService(
                 $c->get(DoseCalculator::class),
                 $c->get(UserPeptideService::class),
                 $c->get(SyringeService::class),
                 $c->get(BacBottleService::class),
+                $c->get(ProfileService::class),
                 $c->get(IdGenerator::class),
                 $c->get(Clock::class),
             );
@@ -131,6 +139,7 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(DoseCalculator::class),
                 $c->get(CompoundService::class),
                 $c->get(SyringeService::class),
+                $c->get(ProfileService::class),
                 $c->get(IdGenerator::class),
                 $c->get(Clock::class),
             );

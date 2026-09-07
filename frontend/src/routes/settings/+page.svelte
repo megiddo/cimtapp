@@ -2,13 +2,19 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { logout, PASSWORD_MIN_LENGTH, downloadUserSqlite, setPassword, type Me } from '$lib/auth';
+  import { logout, PASSWORD_MIN_LENGTH, downloadUserSqlite, fetchStoreBackup, restoreStoreBackup, setPassword, type Me } from '$lib/auth';
   import { APP_VERSION } from '$lib/version';
   import { parseIuInput, syringeLabel } from '$lib/dose';
   import {
     createSyringe,
     fetchSyringes,
     patchSyringe,
+    fetchProfiles,
+    createProfile,
+    patchProfile,
+    deleteProfile,
+    PROFILE_MAX,
+    type Profile,
     type Syringe
   } from '$lib/inventory';
   import { firstFieldError, type FieldMap } from '$lib/payload';
@@ -25,9 +31,18 @@
   let pendingSyringe = $state(false);
   let syringeFields = $state<FieldMap>({});
   let syringeMessage = $state('');
+  let profiles = $state<Profile[]>([]);
+  let profileDrafts = $state<Record<string, string>>({});
+  let newProfileName = $state('');
+  let pendingProfile = $state(false);
+  let profileFields = $state<FieldMap>({});
+  let profileMessage = $state('');
   let loaded = $state(false);
   let pendingExport = $state(false);
   let exportMessage = $state('');
+  let backupAvailable = $state(false);
+  let pendingRestore = $state(false);
+  let restoreMessage = $state('');
 
   const volume = $derived(parseIuInput(volumeMl));
   const capacity = $derived(parseIuInput(capacityIu));
@@ -39,6 +54,9 @@
 
   onMount(async () => {
     syringes = await fetchSyringes();
+    profiles = await fetchProfiles();
+    profileDrafts = Object.fromEntries(profiles.map((item) => [item.id, item.name]));
+    backupAvailable = (await fetchStoreBackup()).available;
     loaded = true;
   });
 
@@ -90,6 +108,63 @@
     syringeMessage = result.message;
   }
 
+  async function reloadProfiles() {
+    profiles = await fetchProfiles();
+    profileDrafts = Object.fromEntries(profiles.map((item) => [item.id, item.name]));
+  }
+
+  async function onAddProfile(event: SubmitEvent) {
+    event.preventDefault();
+    const name = newProfileName.trim();
+    if (name === '') {
+      return;
+    }
+    pendingProfile = true;
+    profileFields = {};
+    profileMessage = '';
+    const result = await createProfile({ name });
+    pendingProfile = false;
+    if (result.ok) {
+      newProfileName = '';
+      await reloadProfiles();
+      return;
+    }
+    profileFields = result.fields;
+    profileMessage = result.message;
+  }
+
+  async function onRenameProfile(id: string) {
+    const name = (profileDrafts[id] ?? '').trim();
+    if (name === '') {
+      return;
+    }
+    pendingProfile = true;
+    profileFields = {};
+    profileMessage = '';
+    const result = await patchProfile(id, { name });
+    pendingProfile = false;
+    if (result.ok) {
+      await reloadProfiles();
+      return;
+    }
+    profileFields = result.fields;
+    profileMessage = result.message;
+  }
+
+  async function onDeleteProfile(id: string) {
+    pendingProfile = true;
+    profileFields = {};
+    profileMessage = '';
+    const result = await deleteProfile(id);
+    pendingProfile = false;
+    if (result.ok) {
+      await reloadProfiles();
+      return;
+    }
+    profileFields = result.fields;
+    profileMessage = result.message;
+  }
+
   async function onLogout() {
     await logout();
     await goto('/login');
@@ -104,12 +179,84 @@
       exportMessage = result.message;
     }
   }
+
+  async function onRestoreBackup() {
+    if (
+      !confirm(
+        'Restore the copy saved before profiles were added? Changes made in profile mode will be discarded, then PepTrack will migrate again.'
+      )
+    ) {
+      return;
+    }
+    pendingRestore = true;
+    restoreMessage = '';
+    const result = await restoreStoreBackup();
+    pendingRestore = false;
+    if (!result.ok) {
+      restoreMessage = result.message;
+      return;
+    }
+    await goto('/');
+  }
 </script>
 
 {#if me}
   <p>{me.email}</p>
   <p>{me.has_google ? 'Google linked.' : 'No Google login.'}</p>
 {/if}
+
+<section>
+  <h2 class="day-heading">Profiles</h2>
+  {#if !loaded}
+    <p class="muted">Loading…</p>
+  {:else}
+    <div class="row-list">
+      {#each profiles as profile (profile.id)}
+        <div class="row profile-row">
+          <label>
+            <span class="sr-only">Name</span>
+            <input
+              type="text"
+              maxlength="40"
+              value={profileDrafts[profile.id] ?? ''}
+              disabled={pendingProfile}
+              oninput={(event) => {
+                profileDrafts = { ...profileDrafts, [profile.id]: event.currentTarget.value };
+              }}
+              onchange={() => onRenameProfile(profile.id)}
+            />
+          </label>
+          {#if profile.is_default}
+            <span class="default-mark">Default</span>
+          {:else}
+            <button
+              type="button"
+              class="text"
+              disabled={pendingProfile}
+              onclick={() => onDeleteProfile(profile.id)}>Delete</button
+            >
+          {/if}
+        </div>
+      {/each}
+    </div>
+  {/if}
+
+  <form class="auth-form" onsubmit={onAddProfile}>
+    <label>
+      Alias
+      <input type="text" maxlength="40" bind:value={newProfileName} disabled={pendingProfile || profiles.length >= PROFILE_MAX} />
+      {#if firstFieldError(profileFields, 'name')}
+        <span class="field-error">{firstFieldError(profileFields, 'name')}</span>
+      {/if}
+    </label>
+    {#if profileMessage && !firstFieldError(profileFields, 'name')}
+      <p class="field-error">{profileMessage}</p>
+    {/if}
+    <button type="submit" disabled={pendingProfile || newProfileName.trim() === '' || profiles.length >= PROFILE_MAX}>
+      {pendingProfile ? 'Saving…' : profiles.length >= PROFILE_MAX ? 'Profile limit reached' : 'Add profile'}
+    </button>
+  </form>
+</section>
 
 <section>
   <h2 class="day-heading">Syringes</h2>
@@ -188,6 +335,18 @@
   <button type="button" class="secondary" disabled={pendingExport} onclick={onDownloadSqlite}>
     {pendingExport ? 'Downloading…' : 'Download sqlite'}
   </button>
+  {#if backupAvailable}
+    <p class="muted">
+      An encrypted copy from before the profiles migration is still on the server. Restore it to undo
+      profile-mode edits and run that migration again.
+    </p>
+    {#if restoreMessage}
+      <p class="field-error">{restoreMessage}</p>
+    {/if}
+    <button type="button" class="secondary" disabled={pendingRestore} onclick={onRestoreBackup}>
+      {pendingRestore ? 'Restoring…' : 'Restore pre-migration backup'}
+    </button>
+  {/if}
 </section>
 
 <button type="button" class="secondary" onclick={onLogout}>Log out</button>

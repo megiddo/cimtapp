@@ -15,9 +15,10 @@ enum UserStoreFormat: int
     case V3UserPeptideTypes = 3;
     case V4NamedOpenVials = 4;
     case V5ArchiveAndAdjustments = 5;
+    case V6Profiles = 6;
 
     public static function current(): self
     {
-        return self::V5ArchiveAndAdjustments;
+        return self::V6Profiles;
     }
 }

@@ -17,14 +17,21 @@
     defaultOpenVialId,
     defaultSyringeId,
     fetchOpenCompounds,
+    fetchProfiles,
     fetchSyringes,
     fetchUses,
     logUse,
     vialLabel,
+    vialsForProfile,
     type Compound,
+    type Profile,
     type Syringe
   } from '$lib/inventory';
 
+  let profiles = $state<Profile[]>([]);
+  let profileId = $state('');
+  let step = $state<'pick' | 'dose'>('pick');
+  let openVials = $state<Compound[]>([]);
   let vials = $state<Compound[]>([]);
   let compoundId = $state('');
   let syringes = $state<Syringe[]>([]);
@@ -41,6 +48,7 @@
   const iu = $derived(parseIuInput(iuText));
   const selected = $derived(vials.find((item) => item.id === compoundId) ?? null);
   const syringe = $derived(syringes.find((item) => item.id === syringeId) ?? null);
+  const selectedProfile = $derived(profiles.find((item) => item.id === profileId) ?? null);
   const preview = $derived(
     selected && iu !== null
       ? previewDose(
@@ -54,21 +62,42 @@
   );
 
   onMount(async () => {
-    const requestedIu = page.url.searchParams.get('iu');
-    if (requestedIu !== null && requestedIu !== '') {
-      iuText = requestedIu;
-    }
-    vials = await fetchOpenCompounds();
+    profiles = await fetchProfiles();
+    openVials = await fetchOpenCompounds();
     syringes = await fetchSyringes();
-    const recent = await fetchUses({ limit: 1 });
-    compoundId = defaultOpenVialId(vials, page.url.searchParams.get('compound_id') ?? recent[0]?.compound_id ?? null);
-    syringeId = defaultSyringeId(syringes, recent[0]?.syringe_id ?? null);
+    const requestedProfile = page.url.searchParams.get('profile_id');
+    if (profiles.length === 1) {
+      await selectProfile(profiles[0].id);
+    } else if (requestedProfile !== null && profiles.some((item) => item.id === requestedProfile)) {
+      await selectProfile(requestedProfile);
+    }
     loaded = true;
   });
 
+  async function selectProfile(id: string) {
+    profileId = id;
+    vials = vialsForProfile(openVials, id);
+    const requestedIu = page.url.searchParams.get('iu');
+    const recent = await fetchUses({ profile_id: id, limit: 1 });
+    const last = recent[0];
+    compoundId = defaultOpenVialId(
+      vials,
+      page.url.searchParams.get('compound_id') ?? last?.compound_id ?? null
+    );
+    syringeId = defaultSyringeId(syringes, last?.syringe_id ?? null);
+    if (requestedIu !== null && requestedIu !== '') {
+      iuText = requestedIu;
+    } else if (last !== undefined) {
+      iuText = String(last.iu);
+    } else {
+      iuText = '25';
+    }
+    step = 'dose';
+  }
+
   async function onSubmit(event: SubmitEvent) {
     event.preventDefault();
-    if (selected === null || iu === null) {
+    if (selected === null || iu === null || profileId === '') {
       return;
     }
     pending = true;
@@ -79,6 +108,7 @@
       const result = await saveWhileOnline(() =>
         logUse({
           iu,
+          profile_id: profileId,
           compound_id: selected.id,
           syringe_id: syringeId === '' ? null : syringeId,
           used_at: usedAt,
@@ -105,13 +135,47 @@
 
 {#if !loaded}
   <p class="muted">Loading…</p>
+{:else if profiles.length === 0}
+  <div class="empty-state">
+    <p>Add a profile in Settings before logging a use.</p>
+    <a class="chip" href="/settings">Settings</a>
+  </div>
+{:else if step === 'pick'}
+  <div class="row-list">
+    {#each profiles as profile (profile.id)}
+      <button type="button" class="row" onclick={() => selectProfile(profile.id)}>
+        <span>
+          <span class="primary">{profile.name}</span>
+          {#if profile.is_default}
+            <div class="secondary">Default</div>
+          {/if}
+        </span>
+      </button>
+    {/each}
+  </div>
 {:else if vials.length === 0}
   <div class="empty-state">
-    <p>Add to inventory before logging a use.</p>
+    {#if selectedProfile}
+      <p>No open vials for {selectedProfile.name}.</p>
+    {:else}
+      <p>Add to inventory before logging a use.</p>
+    {/if}
+    {#if profiles.length > 1}
+      <button type="button" class="chip" onclick={() => (step = 'pick')}>Change profile</button>
+    {/if}
     <a class="chip" href="/inventory/new">Add to Inventory</a>
   </div>
 {:else}
   <form class="auth-form has-sticky" onsubmit={onSubmit}>
+    {#if selectedProfile}
+      <p class="muted">
+        {selectedProfile.name}
+        {#if profiles.length > 1}
+          · <button type="button" class="text" onclick={() => (step = 'pick')}>Change</button>
+        {/if}
+      </p>
+    {/if}
+
     <label>
       Vial
       <select bind:value={compoundId} disabled={pending || vials.length === 1}>

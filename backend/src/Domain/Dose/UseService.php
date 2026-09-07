@@ -17,6 +17,7 @@ final class UseService
         private readonly DoseCalculator $doses,
         private readonly CompoundService $compounds,
         private readonly SyringeService $syringes,
+        private readonly ProfileService $profiles,
         private readonly IdGenerator $ids,
         private readonly Clock $clock,
     ) {
@@ -29,30 +30,34 @@ final class UseService
     {
         $limit = $this->limit($query);
         $before = $this->before($query);
+        $profileId = $query->optionalString('profile_id');
 
-        if ($before === null) {
-            $stmt = $pdo->prepare(
-                'SELECT uses.*, compounds.peptide_type_name, compounds.name AS compound_name
-                 FROM uses
-                 JOIN compounds ON compounds.id = uses.compound_id
-                 ORDER BY uses.used_at DESC, uses.id DESC
-                 LIMIT :limit'
-            );
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->execute();
-        } else {
-            $stmt = $pdo->prepare(
-                'SELECT uses.*, compounds.peptide_type_name, compounds.name AS compound_name
-                 FROM uses
-                 JOIN compounds ON compounds.id = uses.compound_id
-                 WHERE uses.used_at < :before
-                 ORDER BY uses.used_at DESC, uses.id DESC
-                 LIMIT :limit'
-            );
-            $stmt->bindValue(':before', $before);
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->execute();
+        $sql = 'SELECT uses.*, compounds.peptide_type_name, compounds.name AS compound_name,
+                       profiles.name AS profile_name
+                FROM uses
+                JOIN compounds ON compounds.id = uses.compound_id
+                LEFT JOIN profiles ON profiles.id = uses.profile_id';
+        $where = [];
+        if ($before !== null) {
+            $where[] = 'uses.used_at < :before';
         }
+        if ($profileId !== null) {
+            $where[] = 'uses.profile_id = :profile_id';
+        }
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= ' ORDER BY uses.used_at DESC, uses.id DESC LIMIT :limit';
+
+        $stmt = $pdo->prepare($sql);
+        if ($before !== null) {
+            $stmt->bindValue(':before', $before);
+        }
+        if ($profileId !== null) {
+            $stmt->bindValue(':profile_id', $profileId);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -65,9 +70,11 @@ final class UseService
     public function get(PDO $pdo, string $id): array
     {
         $stmt = $pdo->prepare(
-            'SELECT uses.*, compounds.peptide_type_name, compounds.name AS compound_name
+            'SELECT uses.*, compounds.peptide_type_name, compounds.name AS compound_name,
+                    profiles.name AS profile_name
              FROM uses
              JOIN compounds ON compounds.id = uses.compound_id
+             LEFT JOIN profiles ON profiles.id = uses.profile_id
              WHERE uses.id = :id'
         );
         $stmt->execute([':id' => $id]);
@@ -85,7 +92,8 @@ final class UseService
     public function create(PDO $pdo, FieldParser $fields): array
     {
         $compound = $this->compoundForCreate($pdo, $fields);
-        $syringe = $this->syringeForWrite($pdo, $fields, true);
+        $profile = $this->profileForCreate($pdo, $fields, (string) $compound['id']);
+        $syringe = $this->syringeForWrite($pdo, $fields, true, (string) $profile['id']);
         $iu = $this->requireIu($fields);
         $usedAt = $fields->optionalDatetime('used_at') ?? $this->timestamp();
         $notes = $fields->optionalString('notes');
@@ -107,16 +115,17 @@ final class UseService
         $now = $this->timestamp();
         $stmt = $pdo->prepare(
             'INSERT INTO uses (
-                id, compound_id, iu, syringe_id, syringe_label, syringe_volume_ml, syringe_capacity_iu,
+                id, compound_id, profile_id, iu, syringe_id, syringe_label, syringe_volume_ml, syringe_capacity_iu,
                 volume_ml, peptide_mg, used_at, notes, created_at, updated_at
              ) VALUES (
-                :id, :compound_id, :iu, :syringe_id, :syringe_label, :syringe_volume_ml, :syringe_capacity_iu,
+                :id, :compound_id, :profile_id, :iu, :syringe_id, :syringe_label, :syringe_volume_ml, :syringe_capacity_iu,
                 :volume_ml, :peptide_mg, :used_at, :notes, :created_at, :updated_at
              )'
         );
         $stmt->execute([
             ':id' => $id,
             ':compound_id' => $compound['id'],
+            ':profile_id' => $profile['id'],
             ':iu' => $iu,
             ':syringe_id' => $syringe['id'],
             ':syringe_label' => $syringe['label'],
@@ -150,9 +159,12 @@ final class UseService
             ? $fields->requireDatetime('used_at')
             : (string) $existing['used_at'];
         $notes = $fields->has('notes') ? $fields->optionalString('notes') : $existing['notes'];
+        $profileId = $fields->has('profile_id')
+            ? (string) $this->profiles->require($pdo, $fields->requireString('profile_id'))['id']
+            : (string) $existing['profile_id'];
 
         if ($fields->has('syringe_id')) {
-            $syringe = $this->syringeForWrite($pdo, $fields, false);
+            $syringe = $this->syringeForWrite($pdo, $fields, false, $profileId);
         } else {
             $syringe = [
                 'id' => $existing['syringe_id'],
@@ -174,6 +186,7 @@ final class UseService
 
         $stmt = $pdo->prepare(
             'UPDATE uses SET
+                profile_id = :profile_id,
                 iu = :iu,
                 syringe_id = :syringe_id,
                 syringe_label = :syringe_label,
@@ -188,6 +201,7 @@ final class UseService
         );
         $stmt->execute([
             ':id' => $id,
+            ':profile_id' => $profileId,
             ':iu' => $iu,
             ':syringe_id' => $syringe['id'],
             ':syringe_label' => $syringe['label'],
@@ -217,14 +231,14 @@ final class UseService
     /**
      * @return array<string, mixed>
      */
-    private function syringeForWrite(PDO $pdo, FieldParser $fields, bool $create): array
+    private function syringeForWrite(PDO $pdo, FieldParser $fields, bool $create, string $profileId): array
     {
         if ($fields->has('syringe_id') && $fields->optionalString('syringe_id') === null) {
             return $this->syringes->fallbackProfile();
         }
 
         if ($create) {
-            return $this->syringes->syringeForNewUse($pdo, $fields->optionalString('syringe_id'));
+            return $this->syringes->syringeForNewUse($pdo, $fields->optionalString('syringe_id'), $profileId);
         }
 
         $syringeId = $fields->optionalString('syringe_id');
@@ -233,6 +247,23 @@ final class UseService
         }
 
         return $this->syringes->get($pdo, $syringeId);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function profileForCreate(PDO $pdo, FieldParser $fields, string $compoundId): array
+    {
+        $profileId = $fields->optionalString('profile_id');
+        $profile = $profileId === null
+            ? $this->profiles->defaultProfile($pdo)
+            : $this->profiles->require($pdo, $profileId);
+
+        if (!$this->profiles->compoundLinked($pdo, $compoundId, (string) $profile['id'])) {
+            throw new ValidationException(['compound_id' => [DoseConfig::PROFILE_VIAL_MISMATCH]]);
+        }
+
+        return $profile;
     }
 
     /**
@@ -333,6 +364,8 @@ final class UseService
         return [
             'id' => (string) $row['id'],
             'compound_id' => (string) $row['compound_id'],
+            'profile_id' => $row['profile_id'] === null ? null : (string) $row['profile_id'],
+            'profile_name' => $row['profile_name'] === null ? null : (string) $row['profile_name'],
             'peptide_type_name' => (string) $row['peptide_type_name'],
             'compound_name' => (string) $row['compound_name'],
             'iu' => (float) $row['iu'],

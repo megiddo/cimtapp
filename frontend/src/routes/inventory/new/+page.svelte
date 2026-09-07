@@ -18,15 +18,19 @@
     defaultSyringeId,
     fetchCurrentBacBottle,
     fetchPeptideTypes,
+    fetchProfiles,
     fetchSyringes,
     mixCompound,
     type BacBottle,
     type PeptideType,
+    type Profile,
     type Syringe
   } from '$lib/inventory';
 
   let peptides = $state<PeptideType[]>([]);
   let syringes = $state<Syringe[]>([]);
+  let profiles = $state<Profile[]>([]);
+  let selectedProfileIds = $state<string[]>([]);
   let bacBottle = $state<BacBottle | null>(null);
   let peptideTypeId = $state('');
   let vialName = $state('');
@@ -73,6 +77,9 @@
   onMount(async () => {
     peptides = await fetchPeptideTypes();
     syringes = await fetchSyringes();
+    profiles = await fetchProfiles();
+    const defaultProfile = profiles.find((item) => item.is_default) ?? profiles[0];
+    selectedProfileIds = defaultProfile === undefined ? [] : [defaultProfile.id];
     const requested = page.url.searchParams.get('peptide');
     peptideTypeId =
       requested !== null && peptides.some((peptide) => peptide.id === requested)
@@ -128,6 +135,14 @@
     calcCapacityIu = String(selected.capacity_iu);
   }
 
+  function toggleProfile(id: string) {
+    if (selectedProfileIds.includes(id)) {
+      selectedProfileIds = selectedProfileIds.filter((item) => item !== id);
+      return;
+    }
+    selectedProfileIds = [...selectedProfileIds, id];
+  }
+
   function applyMix() {
     if (bottleMg === null || waterNeeded === null) {
       return;
@@ -142,7 +157,7 @@
 
   async function onSubmit(event: SubmitEvent) {
     event.preventDefault();
-    if (mg === null || bac === null || peptideTypeId === '') {
+    if (mg === null || bac === null || peptideTypeId === '' || selectedProfileIds.length === 0) {
       return;
     }
     if (conc !== null && unusualConcentration(conc)) {
@@ -161,7 +176,8 @@
       peptide_mg: mg,
       bac_water_ml: bac,
       compounded_at: compoundedAt,
-      notes: notes === '' ? null : notes
+      notes: notes === '' ? null : notes,
+      profile_ids: selectedProfileIds
     });
     pending = false;
     if (result.ok) {
@@ -237,8 +253,25 @@
       <input type="text" bind:value={notes} />
     </label>
 
+    <fieldset class="check-list">
+      <legend>Profiles</legend>
+      {#each profiles as profile (profile.id)}
+        <label class="check-row">
+          <input
+            type="checkbox"
+            checked={selectedProfileIds.includes(profile.id)}
+            onchange={() => toggleProfile(profile.id)}
+          />
+          <span>{profile.name}{profile.is_default ? ' (default)' : ''}</span>
+        </label>
+      {/each}
+      {#if firstFieldError(fields, 'profile_ids')}
+        <span class="field-error">{firstFieldError(fields, 'profile_ids')}</span>
+      {/if}
+    </fieldset>
+
     <div class="sticky-cta">
-      <button type="submit" disabled={pending || mg === null || bac === null}>{pending ? 'Adding…' : 'Add to Inventory'}</button>
+      <button type="submit" disabled={pending || mg === null || bac === null || selectedProfileIds.length === 0}>{pending ? 'Adding…' : 'Add to Inventory'}</button>
     </div>
   </form>
 {/if}

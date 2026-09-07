@@ -28,10 +28,10 @@ class UserSchemaMigratorTest extends TestCase
         parent::tearDown();
     }
 
-    public function testCurrentFormatIsArchiveAndAdjustments(): void
+    public function testCurrentFormatIsProfiles(): void
     {
-        $this->assertSame(UserStoreFormat::V5ArchiveAndAdjustments, UserStoreFormat::current());
-        $this->assertSame(5, UserStoreFormat::current()->value);
+        $this->assertSame(UserStoreFormat::V6Profiles, UserStoreFormat::current());
+        $this->assertSame(6, UserStoreFormat::current()->value);
     }
 
     public function testCatalogAppliesStrategiesInVersionOrder(): void
@@ -40,32 +40,40 @@ class UserSchemaMigratorTest extends TestCase
             static fn ($strategy): int => $strategy->version()->value,
             UserSchemaCatalog::default()->strategies(),
         );
-        $this->assertSame([1, 2, 3, 4, 5], $versions);
+        $this->assertSame([1, 2, 3, 4, 5, 6], $versions);
         $this->assertCount(1, UserSchemaCatalog::through(UserStoreFormat::V1Initial)->strategies());
         $this->assertCount(2, UserSchemaCatalog::through(UserStoreFormat::V2BacAndSyringeStock)->strategies());
         $this->assertCount(4, UserSchemaCatalog::through(UserStoreFormat::V4NamedOpenVials)->strategies());
         $this->assertCount(5, UserSchemaCatalog::through(UserStoreFormat::V5ArchiveAndAdjustments)->strategies());
+        $this->assertCount(6, UserSchemaCatalog::through(UserStoreFormat::V6Profiles)->strategies());
         $this->assertDirectoryExists(UserSchemaCatalog::migrationsDirectory());
         $this->assertFileExists(UserSchemaCatalog::migrationsDirectory() . '/004_named_open_vials.sql');
         $this->assertFileExists(UserSchemaCatalog::migrationsDirectory() . '/005_archive_and_adjustments.sql');
+        $this->assertFileExists(UserSchemaCatalog::migrationsDirectory() . '/006_profiles.sql');
     }
 
     public function testFreshSqliteReachesCurrentFormat(): void
     {
         $path = $this->dir . '/fresh.sqlite';
         $applied = (new UserMigrator())->migrate($path);
-        $this->assertSame(5, $applied);
+        $this->assertSame(6, $applied);
         $this->assertSame(0, (new UserMigrator())->migrate($path));
 
         $pdo = $this->pdo($path);
-        $this->assertSame(5, (new UserSchemaVersionDetector())->detect($pdo));
+        $this->assertSame(6, (new UserSchemaVersionDetector())->detect($pdo));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'name'));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'is_open'));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'archived_at'));
         $this->assertTrue($this->hasColumn($pdo, 'bac_bottles', 'archived_at'));
+        $this->assertTrue($this->hasColumn($pdo, 'uses', 'profile_id'));
         $this->assertTrue($this->tableExists($pdo, 'compound_adjustments'));
         $this->assertTrue($this->tableExists($pdo, 'user_peptide_types'));
         $this->assertTrue($this->tableExists($pdo, 'bac_bottles'));
+        $this->assertTrue($this->tableExists($pdo, 'profiles'));
+        $this->assertTrue($this->tableExists($pdo, 'compound_profiles'));
+        $default = $pdo->query('SELECT name, is_default FROM profiles')->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame('Default', $default['name']);
+        $this->assertSame(1, (int) $default['is_default']);
     }
 
     public function testDetectsLegacySchemaMigrationsAndMutatesForward(): void
@@ -83,11 +91,12 @@ class UserSchemaMigratorTest extends TestCase
         $pdo = null;
 
         $applied = (new UserMigrator())->migrate($path);
-        $this->assertSame(4, $applied);
+        $this->assertSame(5, $applied);
         $pdo = $this->pdo($path);
-        $this->assertSame(5, (new UserSchemaVersionDetector())->detect($pdo));
+        $this->assertSame(6, (new UserSchemaVersionDetector())->detect($pdo));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'name'));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'archived_at'));
+        $this->assertTrue($this->tableExists($pdo, 'profiles'));
     }
 
     public function testDetectsSchemaShapeWhenMigrationsTableIsMissing(): void
@@ -120,6 +129,10 @@ class UserSchemaMigratorTest extends TestCase
         $v5 = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $v5->exec('CREATE TABLE compound_adjustments (id TEXT)');
         $this->assertSame(5, $detector->detect($v5));
+
+        $v6 = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $v6->exec('CREATE TABLE profiles (id TEXT)');
+        $this->assertSame(6, $detector->detect($v6));
     }
 
     public function testStoredFormatVersionWinsOverShape(): void
@@ -135,6 +148,9 @@ class UserSchemaMigratorTest extends TestCase
 
         $detector->writeVersion($pdo, 5);
         $this->assertSame(5, $detector->detect($pdo));
+
+        $detector->writeVersion($pdo, 6);
+        $this->assertSame(6, $detector->detect($pdo));
     }
 
     public function testEmptyFormatTableFallsThroughToShape(): void
@@ -171,6 +187,47 @@ class UserSchemaMigratorTest extends TestCase
         $row = $pdo->query('SELECT name, is_open FROM compounds')->fetch(PDO::FETCH_ASSOC);
         $this->assertSame('Tirzepatide', $row['name']);
         $this->assertSame(1, (int) $row['is_open']);
+        $linked = $pdo->query('SELECT COUNT(*) FROM compound_profiles')->fetchColumn();
+        $this->assertSame(1, (int) $linked);
+    }
+
+    public function testProfilesMutationSeedsDefaultAndBackfillsUses(): void
+    {
+        $path = $this->dir . '/profiles.sqlite';
+        (new UserMigrator(UserSchemaCatalog::through(UserStoreFormat::V5ArchiveAndAdjustments)))->migrate($path);
+        $pdo = $this->pdo($path);
+        $pdo->exec(
+            "INSERT INTO compounds (
+                id, peptide_type_id, peptide_type_slug, peptide_type_name,
+                peptide_mg, bac_water_ml, compounded_at, notes, created_at, name, is_open
+             ) VALUES (
+                'c1', 'tirzepatide', 'tirzepatide', 'Tirzepatide',
+                10, 2, '2026-08-20T12:00', NULL, '2026-08-20T12:00:00Z', 'Tirzepatide', 1
+             )"
+        );
+        $pdo->exec(
+            "INSERT INTO uses (
+                id, compound_id, iu, syringe_id, syringe_label, syringe_volume_ml, syringe_capacity_iu,
+                volume_ml, peptide_mg, used_at, notes, created_at, updated_at
+             ) VALUES (
+                'u1', 'c1', 25, NULL, '0.5 mL / 50 IU', 0.5, 50,
+                0.25, 1.25, '2026-08-20T16:00', NULL, '2026-08-20T16:00:00Z', '2026-08-20T16:00:00Z'
+             )"
+        );
+        $pdo = null;
+
+        $applied = (new UserMigrator())->migrate($path);
+        $this->assertSame(1, $applied);
+        $pdo = $this->pdo($path);
+        $profile = $pdo->query('SELECT id, name, is_default FROM profiles')->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame('Default', $profile['name']);
+        $this->assertSame(1, (int) $profile['is_default']);
+        $useProfile = $pdo->query("SELECT profile_id FROM uses WHERE id = 'u1'")->fetchColumn();
+        $this->assertSame($profile['id'], $useProfile);
+        $compoundProfile = $pdo->query(
+            "SELECT profile_id FROM compound_profiles WHERE compound_id = 'c1'"
+        )->fetchColumn();
+        $this->assertSame($profile['id'], $compoundProfile);
     }
 
     public function testMissingSqlFileThrows(): void

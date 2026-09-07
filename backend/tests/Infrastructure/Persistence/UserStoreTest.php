@@ -50,7 +50,7 @@ class UserStoreTest extends TestCase
         $this->assertSame([], glob($this->dir . '/tmp/*.sqlite') ?: []);
 
         $this->store->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
-            foreach (['account', 'syringe_profiles', 'compounds', 'uses', 'bac_bottles', 'user_peptide_types', 'compound_adjustments', 'user_store_format'] as $table) {
+            foreach (['account', 'syringe_profiles', 'compounds', 'uses', 'bac_bottles', 'user_peptide_types', 'compound_adjustments', 'profiles', 'compound_profiles', 'user_store_format'] as $table) {
                 $stmt = $pdo->prepare(
                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name"
                 );
@@ -59,6 +59,7 @@ class UserStoreTest extends TestCase
             }
             $version = (int) $pdo->query('SELECT version FROM user_store_format WHERE id = 1')->fetchColumn();
             $this->assertSame(UserStoreFormat::current()->value, $version);
+            $this->assertFalse($this->store->hasPreMigrationBackup(self::USER_ID));
             $names = array_map(
                 static fn (array $col): string => (string) $col['name'],
                 $pdo->query('PRAGMA table_info(compounds)')->fetchAll(PDO::FETCH_ASSOC) ?: [],
@@ -209,6 +210,7 @@ class UserStoreTest extends TestCase
         }
 
         $this->assertSame($before, hash_file('sha256', $enc));
+        $this->assertSame([], glob($this->dir . '/tmp/*.sqlite') ?: []);
         $email = $this->store->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): mixed {
             return $pdo->query('SELECT email FROM account')->fetchColumn();
         });
@@ -275,6 +277,10 @@ class UserStoreTest extends TestCase
         $this->assertContains('name', $cols);
         $this->assertContains('is_open', $cols);
         $this->assertContains('archived_at', $cols);
+        $bak = $this->dir . '/users/' . self::USER_ID . '.sqlite.enc.bak';
+        $this->assertFileExists($bak);
+        $this->assertSame($before, hash_file('sha256', $bak));
+        $this->assertTrue($this->store->hasPreMigrationBackup(self::USER_ID));
     }
 
     public function testExportMissingStoreFails(): void
@@ -282,6 +288,134 @@ class UserStoreTest extends TestCase
         $this->expectException(UserStoreException::class);
         $this->expectExceptionMessage('User store not found.');
         $this->store->exportPlaintext(self::USER_ID, $this->dek);
+    }
+
+    public function testUnlockSnapshotsLegacyStoreAndRestoreRemigrates(): void
+    {
+        $legacy = new UserStore(
+            $this->crypto,
+            new UserMigrator(UserSchemaCatalog::through(UserStoreFormat::V1Initial)),
+            new DataPaths($this->dir),
+        );
+        $legacy->create(self::USER_ID, $this->dek);
+        $legacy->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
+            $pdo->prepare(
+                'INSERT INTO account (user_id, email, password_hash, google_sub, updated_at)
+                 VALUES (?, ?, NULL, NULL, ?)'
+            )->execute([self::USER_ID, 'legacy@example.com', '2026-08-20T15:00:00Z']);
+        });
+        $enc = $this->dir . '/users/' . self::USER_ID . '.sqlite.enc';
+        $bak = $this->dir . '/users/' . self::USER_ID . '.sqlite.enc.bak';
+        $legacyHash = hash_file('sha256', $enc);
+
+        $this->store->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
+            $this->assertSame(
+                UserStoreFormat::current()->value,
+                (int) $pdo->query('SELECT version FROM user_store_format WHERE id = 1')->fetchColumn(),
+            );
+            $pdo->prepare('UPDATE account SET email = ?')->execute(['mutated@example.com']);
+        });
+        $this->assertFileExists($bak);
+        $this->assertSame($legacyHash, hash_file('sha256', $bak));
+        $this->assertNotSame($legacyHash, hash_file('sha256', $enc));
+
+        $this->store->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
+            $this->assertSame('mutated@example.com', $pdo->query('SELECT email FROM account')->fetchColumn());
+        });
+        $this->assertSame($legacyHash, hash_file('sha256', $bak));
+
+        $this->store->restorePreMigrationBackup(self::USER_ID);
+        $this->assertSame($legacyHash, hash_file('sha256', $enc));
+        $this->assertSame($legacyHash, hash_file('sha256', $bak));
+
+        $this->store->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
+            $this->assertSame('legacy@example.com', $pdo->query('SELECT email FROM account')->fetchColumn());
+            $this->assertSame(
+                UserStoreFormat::current()->value,
+                (int) $pdo->query('SELECT version FROM user_store_format WHERE id = 1')->fetchColumn(),
+            );
+            $this->assertSame('Default', $pdo->query('SELECT name FROM profiles WHERE is_default = 1')->fetchColumn());
+        });
+        $this->assertSame($legacyHash, hash_file('sha256', $bak));
+    }
+
+    public function testUnlockFromV5SnapshotsBackupOnSingleStrategy(): void
+    {
+        $legacy = new UserStore(
+            $this->crypto,
+            new UserMigrator(UserSchemaCatalog::through(UserStoreFormat::V5ArchiveAndAdjustments)),
+            new DataPaths($this->dir),
+        );
+        $legacy->create(self::USER_ID, $this->dek);
+        $enc = $this->dir . '/users/' . self::USER_ID . '.sqlite.enc';
+        $legacyHash = hash_file('sha256', $enc);
+
+        $this->store->withUnlocked(self::USER_ID, $this->dek, function (PDO $pdo): void {
+            $this->assertSame(
+                UserStoreFormat::current()->value,
+                (int) $pdo->query('SELECT version FROM user_store_format WHERE id = 1')->fetchColumn(),
+            );
+        });
+
+        $bak = $this->dir . '/users/' . self::USER_ID . '.sqlite.enc.bak';
+        $this->assertFileExists($bak);
+        $this->assertSame($legacyHash, hash_file('sha256', $bak));
+        $this->assertNotSame($legacyHash, hash_file('sha256', $enc));
+    }
+
+    public function testRestoreMissingBackupFails(): void
+    {
+        $this->store->create(self::USER_ID, $this->dek);
+        $this->expectException(UserStoreException::class);
+        $this->expectExceptionMessage('Pre-migration backup not found.');
+        $this->store->restorePreMigrationBackup(self::USER_ID);
+    }
+
+    public function testRestoreAndExportRejectNonUuid(): void
+    {
+        $this->expectException(UserStoreException::class);
+        $this->expectExceptionMessage('User id must be a UUID.');
+        $this->store->restorePreMigrationBackup('../escape');
+    }
+
+    public function testHasPreMigrationBackupRejectsNonUuid(): void
+    {
+        $this->expectException(UserStoreException::class);
+        $this->expectExceptionMessage('User id must be a UUID.');
+        $this->store->hasPreMigrationBackup('../escape');
+    }
+
+    public function testExportRejectsNonUuidUserId(): void
+    {
+        $this->expectException(UserStoreException::class);
+        $this->expectExceptionMessage('User id must be a UUID.');
+        $this->store->exportPlaintext('../escape', $this->dek);
+    }
+
+    public function testSnapshotFailsWhenBackupPathIsADirectory(): void
+    {
+        $legacy = new UserStore(
+            $this->crypto,
+            new UserMigrator(UserSchemaCatalog::through(UserStoreFormat::V1Initial)),
+            new DataPaths($this->dir),
+        );
+        $legacy->create(self::USER_ID, $this->dek);
+        mkdir($this->dir . '/users/' . self::USER_ID . '.sqlite.enc.bak', 0700, true);
+        $this->expectException(UserStoreException::class);
+        $this->expectExceptionMessage('Failed to snapshot user store.');
+        $this->store->withUnlocked(self::USER_ID, $this->dek, static fn (PDO $pdo): int => 1);
+    }
+
+    public function testRestoreFailsWhenEncPathIsADirectory(): void
+    {
+        $this->store->create(self::USER_ID, $this->dek);
+        $enc = $this->dir . '/users/' . self::USER_ID . '.sqlite.enc';
+        copy($enc, $enc . '.bak');
+        unlink($enc);
+        mkdir($enc);
+        $this->expectException(UserStoreException::class);
+        $this->expectExceptionMessage('Failed to restore user store.');
+        $this->store->restorePreMigrationBackup(self::USER_ID);
     }
 
     public function testCreateTwiceFails(): void
@@ -331,6 +465,14 @@ class UserStoreTest extends TestCase
         $this->assertSame(
             $this->dir . '/users/' . self::USER_ID . '.sqlite.enc.tmp',
             $paths->userEncStaging(self::USER_ID)
+        );
+        $this->assertSame(
+            $this->dir . '/users/' . self::USER_ID . '.sqlite.enc.bak',
+            $paths->userEncBackup(self::USER_ID)
+        );
+        $this->assertSame(
+            $this->dir . '/users/' . self::USER_ID . '.sqlite.enc.bak.tmp',
+            $paths->userEncBackupStaging(self::USER_ID)
         );
 
         $this->expectException(\RuntimeException::class);

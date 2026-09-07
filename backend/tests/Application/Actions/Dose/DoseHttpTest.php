@@ -992,6 +992,157 @@ class DoseHttpTest extends TestCase
         $this->assertSame(422, $badCount->getStatusCode());
     }
 
+    public function testProfilesDefaultRenameCapAndDeleteRules(): void
+    {
+        $app = $this->getAppInstance();
+        $sid = $this->register($app);
+
+        $unauth = $app->handle($this->createRequest('GET', '/api/v1/profiles'));
+        $this->assertSame(401, $unauth->getStatusCode());
+
+        $listed = $this->json($this->authed($app, 'GET', '/api/v1/profiles', $sid))['data'];
+        $this->assertCount(1, $listed);
+        $this->assertSame('Default', $listed[0]['name']);
+        $this->assertTrue($listed[0]['is_default']);
+        $defaultId = $listed[0]['id'];
+
+        $renamed = $this->json($this->authedJson($app, 'PATCH', '/api/v1/profiles/' . $defaultId, [
+            'name' => 'Alex',
+        ], $sid))['data'];
+        $this->assertSame('Alex', $renamed['name']);
+        $this->assertTrue($renamed['is_default']);
+
+        $this->assertSame(422, $this->authed($app, 'DELETE', '/api/v1/profiles/' . $defaultId, $sid)->getStatusCode());
+        $this->assertSame(
+            ['id' => [DoseConfig::PROFILE_DEFAULT_REQUIRED]],
+            $this->json($this->authed($app, 'DELETE', '/api/v1/profiles/' . $defaultId, $sid))['error']['fields']
+        );
+
+        $created = $this->authedJson($app, 'POST', '/api/v1/profiles', ['name' => 'Sam'], $sid);
+        $this->assertSame(201, $created->getStatusCode());
+        $extra = $this->json($created)['data'];
+        $this->assertSame('Sam', $extra['name']);
+        $this->assertFalse($extra['is_default']);
+
+        $unused = $this->json($this->authedJson($app, 'POST', '/api/v1/profiles', ['name' => 'Unused'], $sid))['data'];
+        $this->assertSame(204, $this->authed($app, 'DELETE', '/api/v1/profiles/' . $unused['id'], $sid)->getStatusCode());
+
+        $this->authedJson($app, 'POST', '/api/v1/profiles', ['name' => 'Two'], $sid);
+        $this->authedJson($app, 'POST', '/api/v1/profiles', ['name' => 'Three'], $sid);
+        $this->authedJson($app, 'POST', '/api/v1/profiles', ['name' => 'Four'], $sid);
+        $fifth = $this->authedJson($app, 'POST', '/api/v1/profiles', ['name' => 'Five'], $sid);
+        $this->assertSame(422, $fifth->getStatusCode());
+        $this->assertSame(['name' => [DoseConfig::PROFILE_LIMIT]], $this->json($fifth)['error']['fields']);
+
+        $tooLong = $this->authedJson($app, 'PATCH', '/api/v1/profiles/' . $extra['id'], [
+            'name' => str_repeat('a', 41),
+        ], $sid);
+        $this->assertSame(422, $tooLong->getStatusCode());
+
+        $vial = $this->json($this->mixTirzepatide($app, $sid, '2026-08-20T12:00'))['data'];
+        $this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $vial['id'], [
+            'profile_ids' => [$defaultId, $extra['id']],
+        ], $sid);
+        $this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 10,
+            'profile_id' => $extra['id'],
+        ], $sid);
+        $blocked = $this->authed($app, 'DELETE', '/api/v1/profiles/' . $extra['id'], $sid);
+        $this->assertSame(422, $blocked->getStatusCode());
+        $this->assertSame(['id' => [DoseConfig::PROFILE_HAS_USES]], $this->json($blocked)['error']['fields']);
+
+        $this->assertSame(404, $this->authed($app, 'DELETE', '/api/v1/profiles/missing', $sid)->getStatusCode());
+        $this->assertSame(404, $this->authedJson($app, 'PATCH', '/api/v1/profiles/missing', ['name' => 'X'], $sid)->getStatusCode());
+    }
+
+    public function testCompoundProfileIdsAndUseMustMatch(): void
+    {
+        $app = $this->getAppInstance();
+        $sid = $this->register($app);
+        $defaultId = $this->json($this->authed($app, 'GET', '/api/v1/profiles', $sid))['data'][0]['id'];
+        $sam = $this->json($this->authedJson($app, 'POST', '/api/v1/profiles', ['name' => 'Sam'], $sid))['data'];
+
+        $mixed = $this->json($this->mixTirzepatide($app, $sid, '2026-08-20T12:00'))['data'];
+        $this->assertSame([$defaultId], $mixed['profile_ids']);
+
+        $useDefault = $this->json($this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 5,
+            'compound_id' => $mixed['id'],
+        ], $sid))['data'];
+        $this->assertSame($defaultId, $useDefault['profile_id']);
+        $this->assertSame('Default', $useDefault['profile_name']);
+
+        $mismatch = $this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 5,
+            'compound_id' => $mixed['id'],
+            'profile_id' => $sam['id'],
+        ], $sid);
+        $this->assertSame(422, $mismatch->getStatusCode());
+        $this->assertSame(
+            ['compound_id' => [DoseConfig::PROFILE_VIAL_MISMATCH]],
+            $this->json($mismatch)['error']['fields']
+        );
+
+        $patched = $this->json($this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $mixed['id'], [
+            'profile_ids' => [$defaultId, $sam['id']],
+        ], $sid))['data'];
+        $this->assertEqualsCanonicalizing([$defaultId, $sam['id']], $patched['profile_ids']);
+
+        $useSam = $this->json($this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 5,
+            'compound_id' => $mixed['id'],
+            'profile_id' => $sam['id'],
+        ], $sid))['data'];
+        $this->assertSame($sam['id'], $useSam['profile_id']);
+        $this->assertSame('Sam', $useSam['profile_name']);
+
+        $emptyIds = $this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $mixed['id'], [
+            'profile_ids' => [],
+        ], $sid);
+        $this->assertSame(422, $emptyIds->getStatusCode());
+
+        $unknown = $this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 5,
+            'profile_id' => 'missing',
+        ], $sid);
+        $this->assertSame(422, $unknown->getStatusCode());
+    }
+
+    public function testUseProfileFilterAndMigrate(): void
+    {
+        $app = $this->getAppInstance();
+        $sid = $this->register($app);
+        $defaultId = $this->json($this->authed($app, 'GET', '/api/v1/profiles', $sid))['data'][0]['id'];
+        $sam = $this->json($this->authedJson($app, 'POST', '/api/v1/profiles', ['name' => 'Sam'], $sid))['data'];
+        $vial = $this->json($this->mixTirzepatide($app, $sid, '2026-08-20T12:00'))['data'];
+        $this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $vial['id'], [
+            'profile_ids' => [$defaultId, $sam['id']],
+        ], $sid);
+
+        $first = $this->json($this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 5,
+            'profile_id' => $defaultId,
+            'used_at' => '2026-08-20T10:00:00Z',
+        ], $sid))['data'];
+        $second = $this->json($this->authedJson($app, 'POST', '/api/v1/uses', [
+            'iu' => 6,
+            'profile_id' => $sam['id'],
+            'used_at' => '2026-08-20T11:00:00Z',
+        ], $sid))['data'];
+
+        $all = $this->json($this->authed($app, 'GET', '/api/v1/uses', $sid))['data'];
+        $this->assertCount(2, $all);
+        $samOnly = $this->json($this->authed($app, 'GET', '/api/v1/uses', $sid, 'profile_id=' . $sam['id']))['data'];
+        $this->assertSame([$second['id']], array_column($samOnly, 'id'));
+
+        $migrated = $this->json($this->authedJson($app, 'PATCH', '/api/v1/uses/' . $first['id'], [
+            'profile_id' => $sam['id'],
+        ], $sid))['data'];
+        $this->assertSame($sam['id'], $migrated['profile_id']);
+        $this->assertSame($vial['id'], $migrated['compound_id']);
+        $this->assertSame('Sam', $migrated['profile_name']);
+    }
+
     /**
      * @param list<array<string, mixed>> $uses
      */

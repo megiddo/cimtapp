@@ -3,19 +3,33 @@
   import { formatConcentration, formatDoseLine, formatMg, formatMl, formatIu } from '$lib/dose';
   import { formatDateTime } from '$lib/history';
   import { remainderTone, remainderToneMessage } from '$lib/remainder';
-  import { fetchOpenCompounds, fetchUses, vialLabel, type Compound, type LoggedUse } from '$lib/inventory';
+  import { fetchOpenCompounds, fetchProfiles, fetchUses, vialLabel, type Compound, type LoggedUse, type Profile } from '$lib/inventory';
 
   let open = $state<Compound[]>([]);
   let uses = $state<LoggedUse[]>([]);
+  let profiles = $state<Profile[]>([]);
   let loaded = $state(false);
 
   onMount(async () => {
     open = await fetchOpenCompounds();
     uses = await fetchUses({ limit: 5 });
+    profiles = await fetchProfiles();
     loaded = true;
   });
 
   const last = $derived(uses[0] ?? null);
+  const showProfileLabel = $derived(profiles.length > 1);
+
+  function logHref(vial: Compound): string {
+    const params = new URLSearchParams({ compound_id: vial.id });
+    if (last && last.compound_id === vial.id) {
+      params.set('iu', String(last.iu));
+      if (last.profile_id) {
+        params.set('profile_id', last.profile_id);
+      }
+    }
+    return `/use/new?${params.toString()}`;
+  }
 </script>
 
 {#if !loaded}
@@ -43,7 +57,7 @@
       {#if tone === 'danger'}
         <a class="chip" href="/inventory/new">Add to Inventory</a>
       {:else}
-        <a class="chip" href="/use/new?compound_id={vial.id}{last && last.compound_id === vial.id ? `&iu=${last.iu}` : ''}">
+        <a class="chip" href={logHref(vial)}>
           {last && last.compound_id === vial.id ? `Log ${formatIu(last.iu)} IU again` : 'Log use'}
         </a>
       {/if}
@@ -58,7 +72,7 @@
         <a class="row" href="/history/{use.id}">
           <span>
             <span class="primary">{formatDoseLine(use.iu, use.peptide_mg)}</span>
-            <div class="secondary">{formatDateTime(use.used_at)} · {vialLabel({ name: use.compound_name, peptide_type_name: use.peptide_type_name })}</div>
+            <div class="secondary">{formatDateTime(use.used_at)} · {#if showProfileLabel && use.profile_name}{use.profile_name} · {/if}{vialLabel({ name: use.compound_name, peptide_type_name: use.peptide_type_name })}</div>
           </span>
         </a>
       {/each}
