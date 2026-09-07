@@ -186,29 +186,34 @@ class DoseHttpTest extends TestCase
         $this->assertSame(422, $tooLong->getStatusCode());
         $this->assertSame(['name' => [DoseConfig::VIAL_NAME_TOO_LONG]], $this->json($tooLong)['error']['fields']);
 
-        $closed = $this->json($this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $sema['id'], [
+        $ignoredClose = $this->json($this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $sema['id'], [
             'is_open' => false,
         ], $sid))['data'];
-        $this->assertFalse($closed['is_open']);
+        $this->assertTrue($ignoredClose['is_open']);
+        $this->assertNull($ignoredClose['archived_at']);
 
         $stillOpen = $this->json($this->authed($app, 'GET', '/api/v1/compounds/open', $sid))['data'];
-        $this->assertCount(2, $stillOpen);
+        $this->assertCount(3, $stillOpen);
+        $this->assertSame(['Travel', 'Tirzepatide', 'Fridge A'], array_map(
+            static fn (array $row): string => $row['name'],
+            $stillOpen,
+        ));
         $current = $this->json($this->authed($app, 'GET', '/api/v1/compounds/current', $sid))['data'];
-        $this->assertNotSame($sema['id'], $current['id']);
+        $this->assertSame($sema['id'], $current['id']);
         $this->assertTrue($current['is_open']);
 
         $nullOpen = $this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $fridge['id'], [
             'is_open' => null,
         ], $sid);
-        $this->assertSame(422, $nullOpen->getStatusCode());
-        $this->assertSame(['is_open' => [DoseConfig::MUST_BE_BOOLEAN]], $this->json($nullOpen)['error']['fields']);
+        $this->assertSame(200, $nullOpen->getStatusCode());
+        $this->assertTrue($this->json($nullOpen)['data']['is_open']);
 
-        $reopened = $this->json($this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $sema['id'], [
+        $renamed = $this->json($this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $sema['id'], [
             'is_open' => true,
             'name' => 'Travel kit',
         ], $sid))['data'];
-        $this->assertTrue($reopened['is_open']);
-        $this->assertSame('Travel kit', $reopened['name']);
+        $this->assertTrue($renamed['is_open']);
+        $this->assertSame('Travel kit', $renamed['name']);
 
         $blankCreate = $this->authedJson($app, 'POST', '/api/v1/compounds', [
             'peptide_type_id' => 'liraglutide',
@@ -228,9 +233,10 @@ class DoseHttpTest extends TestCase
             'bac_water_ml' => 1.0,
             'compounded_at' => '2026-08-21T10:00',
         ], $sid))['data'];
-        $this->assertFalse($closedMix['is_open']);
+        $this->assertTrue($closedMix['is_open']);
+        $this->assertNull($closedMix['archived_at']);
         $this->assertSame('Archive', $closedMix['name']);
-        $this->assertCount(3, $this->json($this->authed($app, 'GET', '/api/v1/compounds/open', $sid))['data']);
+        $this->assertCount(4, $this->json($this->authed($app, 'GET', '/api/v1/compounds/open', $sid))['data']);
     }
 
     public function testVolumeAdjustAndArchiveHideEmptyInventory(): void
@@ -323,9 +329,14 @@ class DoseHttpTest extends TestCase
         $this->assertSame(422, $this->authedJson($app, 'POST', '/api/v1/compounds/' . $id . '/adjust', [
             'remaining_ml' => 0.5,
         ], $sid)->getStatusCode());
-        $this->assertSame(422, $this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $id, [
+        $ignoredReopen = $this->json($this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $id, [
             'is_open' => true,
-        ], $sid)->getStatusCode());
+        ], $sid))['data'];
+        $this->assertNotNull($ignoredReopen['archived_at']);
+        $this->assertFalse($ignoredReopen['is_open']);
+        $allCompounds = $this->json($this->authed($app, 'GET', '/api/v1/compounds', $sid, 'view=all'))['data'];
+        $this->assertSame($id, $allCompounds[count($allCompounds) - 1]['id']);
+        $this->assertNotNull($allCompounds[count($allCompounds) - 1]['archived_at']);
         $this->assertSame(422, $this->authedJson($app, 'POST', '/api/v1/uses', [
             'iu' => 5,
             'compound_id' => $id,
@@ -361,8 +372,97 @@ class DoseHttpTest extends TestCase
         );
         $this->assertNotContains($bottle['id'], $listedBottles);
         $this->assertContains($notEmptyBottle['id'], $listedBottles);
+        $allBottles = array_map(
+            static fn (array $row): string => (string) $row['id'],
+            $this->json($this->authed($app, 'GET', '/api/v1/bac-bottles', $sid, 'view=all'))['data'],
+        );
+        $this->assertContains($bottle['id'], $allBottles);
+        $this->assertSame($notEmptyBottle['id'], $allBottles[0]);
         $this->assertSame(422, $this->authedJson($app, 'POST', '/api/v1/bac-bottles/' . $bottle['id'] . '/archive', [], $sid)->getStatusCode());
         $this->assertSame(404, $this->authedJson($app, 'POST', '/api/v1/bac-bottles/missing/archive', [], $sid)->getStatusCode());
+    }
+
+    public function testSyringeArchiveAndViewAllLists(): void
+    {
+        $app = $this->getAppInstance();
+        $sid = $this->register($app);
+
+        $seeded = $this->json($this->authed($app, 'GET', '/api/v1/syringes', $sid))['data'][0];
+        $this->assertSame(50, $seeded['quantity']);
+        $this->assertNull($seeded['archived_at']);
+
+        $stillStocked = $this->authedJson($app, 'POST', '/api/v1/syringes/' . $seeded['id'] . '/archive', [], $sid);
+        $this->assertSame(422, $stillStocked->getStatusCode());
+        $this->assertSame(
+            ['id' => [DoseConfig::ARCHIVE_NOT_EMPTY]],
+            $this->json($stillStocked)['error']['fields'],
+        );
+        $this->assertSame(DoseConfig::ARCHIVE_NOT_EMPTY, $this->json($stillStocked)['error']['description']);
+
+        $empty = $this->json($this->authedJson($app, 'POST', '/api/v1/syringes', [
+            'volume_ml' => 1,
+            'capacity_iu' => 40,
+            'label' => 'empty-type',
+        ], $sid))['data'];
+        $this->assertSame(0, $empty['quantity']);
+        $this->assertNull($empty['archived_at']);
+
+        $archiveRes = $this->authedJson($app, 'POST', '/api/v1/syringes/' . $empty['id'] . '/archive', [], $sid);
+        $this->assertSame(200, $archiveRes->getStatusCode());
+        $archivedSyringe = $this->json($archiveRes)['data'];
+        $this->assertNotNull($archivedSyringe['archived_at']);
+        $this->assertSame(0, $archivedSyringe['quantity']);
+
+        $again = $this->authedJson($app, 'POST', '/api/v1/syringes/' . $empty['id'] . '/archive', [], $sid);
+        $this->assertSame(422, $again->getStatusCode());
+        $this->assertSame(
+            ['id' => [DoseConfig::ALREADY_ARCHIVED]],
+            $this->json($again)['error']['fields'],
+        );
+        $this->assertSame(404, $this->authedJson($app, 'POST', '/api/v1/syringes/missing/archive', [], $sid)->getStatusCode());
+
+        $openSyringes = array_column($this->json($this->authed($app, 'GET', '/api/v1/syringes', $sid))['data'], 'id');
+        $this->assertSame([$seeded['id']], $openSyringes);
+        $allSyringes = $this->json($this->authed($app, 'GET', '/api/v1/syringes', $sid, 'view=all'))['data'];
+        $this->assertSame([$seeded['id'], $empty['id']], array_column($allSyringes, 'id'));
+        $this->assertNull($allSyringes[0]['archived_at']);
+        $this->assertNotNull($allSyringes[1]['archived_at']);
+
+        $older = $this->json($this->mixTirzepatide($app, $sid, '2026-08-18T10:00'))['data'];
+        $newer = $this->json($this->mixTirzepatide($app, $sid, '2026-08-20T10:00'))['data'];
+        $this->authedJson($app, 'POST', '/api/v1/compounds/' . $older['id'] . '/adjust', [
+            'remaining_ml' => 0,
+        ], $sid);
+        $this->authedJson($app, 'POST', '/api/v1/compounds/' . $older['id'] . '/archive', [], $sid);
+
+        $openCompounds = array_column($this->json($this->authed($app, 'GET', '/api/v1/compounds', $sid))['data'], 'id');
+        $this->assertSame([$newer['id']], $openCompounds);
+        $allCompounds = $this->json($this->authed($app, 'GET', '/api/v1/compounds', $sid, 'view=all'))['data'];
+        $this->assertSame([$newer['id'], $older['id']], array_column($allCompounds, 'id'));
+        $this->assertNull($allCompounds[0]['archived_at']);
+        $this->assertNotNull($allCompounds[1]['archived_at']);
+        $unknownView = array_column(
+            $this->json($this->authed($app, 'GET', '/api/v1/compounds', $sid, 'view=archived'))['data'],
+            'id',
+        );
+        $this->assertSame([$newer['id']], $unknownView);
+
+        $keepBottle = $this->json($this->authed($app, 'GET', '/api/v1/bac-bottles/current', $sid))['data'];
+        $toArchive = $this->json($this->authedJson($app, 'POST', '/api/v1/bac-bottles', [
+            'volume_ml' => 5,
+            'opened_at' => '2026-08-10T00:00',
+        ], $sid))['data'];
+        $this->authedJson($app, 'POST', '/api/v1/bac-bottles/' . $toArchive['id'] . '/burn', [
+            'ml' => 5,
+        ], $sid);
+        $this->authedJson($app, 'POST', '/api/v1/bac-bottles/' . $toArchive['id'] . '/archive', [], $sid);
+
+        $openBac = array_column($this->json($this->authed($app, 'GET', '/api/v1/bac-bottles', $sid))['data'], 'id');
+        $this->assertSame([$keepBottle['id']], $openBac);
+        $allBac = $this->json($this->authed($app, 'GET', '/api/v1/bac-bottles', $sid, 'view=all'))['data'];
+        $this->assertSame([$keepBottle['id'], $toArchive['id']], array_column($allBac, 'id'));
+        $this->assertNull($allBac[0]['archived_at']);
+        $this->assertNotNull($allBac[1]['archived_at']);
     }
 
     public function testLogUseWorkedExampleOverdrawBoundaryAndEditRemainder(): void

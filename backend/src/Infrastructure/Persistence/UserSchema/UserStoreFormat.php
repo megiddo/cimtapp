@@ -16,9 +16,10 @@ enum UserStoreFormat: int
     case V4NamedOpenVials = 4;
     case V5ArchiveAndAdjustments = 5;
     case V6Profiles = 6;
+    case V7SyringeArchive = 7;
 
     public static function current(): self
     {
-        return self::V6Profiles;
+        return self::V7SyringeArchive;
     }
 }

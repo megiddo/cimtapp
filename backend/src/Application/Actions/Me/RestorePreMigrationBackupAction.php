@@ -7,8 +7,8 @@ namespace App\Application\Actions\Me;
 use App\Application\Actions\Action;
 use App\Domain\Auth\AuthConfig;
 use App\Domain\Auth\AuthContext;
+use App\Domain\Auth\UserStorePort;
 use App\Domain\DomainException\DomainRecordNotFoundException;
-use App\Infrastructure\Persistence\UserStore;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Log\LoggerInterface;
 use Slim\Exception\HttpUnauthorizedException;
@@ -21,7 +21,7 @@ final class RestorePreMigrationBackupAction extends Action
 {
     public function __construct(
         LoggerInterface $logger,
-        private readonly UserStore $userStore,
+        private readonly UserStorePort $userStore,
     ) {
         parent::__construct($logger);
     }

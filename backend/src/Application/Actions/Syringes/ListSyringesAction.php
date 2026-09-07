@@ -6,6 +6,7 @@ namespace App\Application\Actions\Syringes;
 
 use App\Application\Actions\AuthenticatedAction;
 use App\Domain\Auth\UserStorePort;
+use App\Domain\Dose\StockList;
 use App\Domain\Dose\SyringeService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Log\LoggerInterface;
@@ -22,6 +23,8 @@ final class ListSyringesAction extends AuthenticatedAction
 
     protected function action(): Response
     {
-        return $this->respondWithData($this->syringes->list($this->userPdo()));
+        return $this->respondWithData(
+            $this->syringes->list($this->userPdo(), StockList::fromQuery($this->request->getQueryParams())),
+        );
     }
 }

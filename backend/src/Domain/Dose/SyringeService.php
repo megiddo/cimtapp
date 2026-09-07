@@ -18,13 +18,18 @@ final class SyringeService
     /**
      * @return list<array<string, mixed>>
      */
-    public function list(PDO $pdo): array
+    public function list(PDO $pdo, ?StockList $query = null): array
     {
-        $stmt = $pdo->query(
-            'SELECT id, label, volume_ml, capacity_iu, is_default, quantity
-             FROM syringe_profiles
-             ORDER BY is_default DESC, label ASC, id ASC'
-        );
+        $query ??= StockList::openOnly();
+        $sql = $query->includesArchived()
+            ? 'SELECT id, label, volume_ml, capacity_iu, is_default, quantity, archived_at
+               FROM syringe_profiles
+               ORDER BY (archived_at IS NULL) DESC, is_default DESC, label ASC, id ASC'
+            : 'SELECT id, label, volume_ml, capacity_iu, is_default, quantity, archived_at
+               FROM syringe_profiles
+               WHERE archived_at IS NULL
+               ORDER BY is_default DESC, label ASC, id ASC';
+        $stmt = $pdo->query($sql);
         $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_values(array_map($this->map(...), is_array($rows) ? $rows : []));
@@ -49,9 +54,10 @@ final class SyringeService
     public function defaultSyringe(PDO $pdo): array
     {
         $stmt = $pdo->query(
-            'SELECT id, label, volume_ml, capacity_iu, is_default, quantity
+            'SELECT id, label, volume_ml, capacity_iu, is_default, quantity, archived_at
              FROM syringe_profiles
-             WHERE is_default = 1
+             WHERE archived_at IS NULL
+             ORDER BY is_default DESC, label ASC, id ASC
              LIMIT 1'
         );
         $row = $stmt === false ? false : $stmt->fetch(PDO::FETCH_ASSOC);
@@ -79,6 +85,7 @@ final class SyringeService
             'capacity_iu' => DoseConfig::FALLBACK_SYRINGE_CAPACITY_IU,
             'is_default' => false,
             'quantity' => 0,
+            'archived_at' => null,
         ];
     }
 
@@ -204,7 +211,7 @@ final class SyringeService
     {
         $this->get($pdo, $id);
         $others = array_values(array_filter(
-            $this->list($pdo),
+            $this->list($pdo, StockList::allGrouped()),
             static fn (array $row): bool => (string) $row['id'] !== $id,
         ));
         if ($others === []) {
@@ -296,7 +303,7 @@ final class SyringeService
     private function find(PDO $pdo, string $id): ?array
     {
         $stmt = $pdo->prepare(
-            'SELECT id, label, volume_ml, capacity_iu, is_default, quantity
+            'SELECT id, label, volume_ml, capacity_iu, is_default, quantity, archived_at
              FROM syringe_profiles
              WHERE id = :id'
         );
@@ -319,6 +326,9 @@ final class SyringeService
             'capacity_iu' => (float) $row['capacity_iu'],
             'is_default' => (int) $row['is_default'] === 1,
             'quantity' => (int) $row['quantity'],
+            'archived_at' => !isset($row['archived_at']) || $row['archived_at'] === null || $row['archived_at'] === ''
+                ? null
+                : (string) $row['archived_at'],
         ];
     }
 }

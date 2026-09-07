@@ -7,7 +7,7 @@ namespace App\Application\Actions\Me;
 use App\Application\Actions\Action;
 use App\Domain\Auth\AuthConfig;
 use App\Domain\Auth\AuthContext;
-use App\Infrastructure\Persistence\UserStore;
+use App\Domain\Auth\UserStorePort;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Log\LoggerInterface;
 use Slim\Exception\HttpUnauthorizedException;
@@ -20,7 +20,7 @@ final class ExportUserAction extends Action
 {
     public function __construct(
         LoggerInterface $logger,
-        private readonly UserStore $userStore,
+        private readonly UserStorePort $userStore,
     ) {
         parent::__construct($logger);
     }

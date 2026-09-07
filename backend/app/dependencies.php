@@ -19,6 +19,7 @@ use App\Domain\Auth\UserProvisioner;
 use App\Domain\Auth\UserStorePort;
 use App\Domain\Crypto\AmkRotator;
 use App\Domain\Crypto\Crypto;
+use App\Domain\Dose\ArchivePolicy;
 use App\Domain\Dose\BacBottleService;
 use App\Domain\Dose\CompoundService;
 use App\Domain\Dose\DoseCalculator;
@@ -100,6 +101,9 @@ return function (ContainerBuilder $containerBuilder): void {
         EmailNormalizer::class => static fn (): EmailNormalizer => new EmailNormalizer(),
         CredentialParser::class => static fn (): CredentialParser => new CredentialParser(),
         DoseCalculator::class => static fn (): DoseCalculator => new DoseCalculator(),
+        ArchivePolicy::class => static function (ContainerInterface $c): ArchivePolicy {
+            return new ArchivePolicy($c->get(DoseCalculator::class));
+        },
         SyringeService::class => static function (ContainerInterface $c): SyringeService {
             return new SyringeService($c->get(IdGenerator::class));
         },
@@ -108,6 +112,7 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(DoseCalculator::class),
                 $c->get(IdGenerator::class),
                 $c->get(Clock::class),
+                $c->get(ArchivePolicy::class),
             );
         },
         UserPeptideService::class => static function (ContainerInterface $c): UserPeptideService {
@@ -132,6 +137,7 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(ProfileService::class),
                 $c->get(IdGenerator::class),
                 $c->get(Clock::class),
+                $c->get(ArchivePolicy::class),
             );
         },
         UseService::class => static function (ContainerInterface $c): UseService {

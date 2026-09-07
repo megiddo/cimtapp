@@ -21,17 +21,20 @@ final class CompoundService
         private readonly ProfileService $profiles,
         private readonly IdGenerator $ids,
         private readonly Clock $clock,
+        private readonly ArchivePolicy $archivePolicy,
     ) {
     }
 
     /**
      * @return list<array<string, mixed>>
      */
-    public function list(PDO $pdo): array
+    public function list(PDO $pdo, ?StockList $query = null): array
     {
-        $stmt = $pdo->query(
-            'SELECT * FROM compounds WHERE archived_at IS NULL ORDER BY compounded_at DESC, id DESC'
-        );
+        $query ??= StockList::openOnly();
+        $sql = $query->includesArchived()
+            ? 'SELECT * FROM compounds ORDER BY (archived_at IS NULL) DESC, compounded_at DESC, id DESC'
+            : 'SELECT * FROM compounds WHERE archived_at IS NULL ORDER BY compounded_at DESC, id DESC';
+        $stmt = $pdo->query($sql);
         $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
         $default = $this->syringes->defaultSyringe($pdo);
 
@@ -63,16 +66,7 @@ final class CompoundService
      */
     public function listOpen(PDO $pdo): array
     {
-        $stmt = $pdo->query(
-            'SELECT * FROM compounds WHERE is_open = 1 AND archived_at IS NULL ORDER BY compounded_at DESC, id DESC'
-        );
-        $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $default = $this->syringes->defaultSyringe($pdo);
-
-        return array_values(array_map(
-            fn (array $row): array => $this->present($pdo, $row, $default),
-            is_array($rows) ? $rows : [],
-        ));
+        return $this->list($pdo, StockList::openOnly());
     }
 
     /**
@@ -166,7 +160,6 @@ final class CompoundService
         $compoundedAt = $fields->requireDatetime('compounded_at');
         $notes = $fields->optionalString('notes');
         $name = $this->vialName($fields, $peptide['name'], null);
-        $isOpen = $this->vialOpen($fields, true);
         $profileIds = $this->profileIdsForWrite($pdo, $fields, true);
         if ($profileIds === null) {
             $profileIds = [(string) $this->profiles->defaultProfile($pdo)['id']];
@@ -198,7 +191,7 @@ final class CompoundService
             ':created_at' => $now,
             ':bac_bottle_id' => $bottleId,
             ':name' => $name,
-            ':is_open' => $isOpen ? 1 : 0,
+            ':is_open' => 1,
         ]);
 
         $this->profiles->replaceCompoundProfiles($pdo, $id, $profileIds);
@@ -229,10 +222,6 @@ final class CompoundService
             : (string) $existing['compounded_at'];
         $notes = $fields->has('notes') ? $fields->optionalString('notes') : $existing['notes'];
         $name = $this->vialName($fields, (string) $existing['peptide_type_name'], (string) $existing['name']);
-        $isOpen = $this->vialOpen($fields, (bool) $existing['is_open']);
-        if ($isOpen && $existing['archived_at'] !== null) {
-            throw new ValidationException(['is_open' => [DoseConfig::COMPOUND_ARCHIVED]], DoseConfig::COMPOUND_ARCHIVED);
-        }
 
         $mixChanged = $this->doses->roundMg((float) $existing['peptide_mg']) !== $peptideMg
             || abs((float) $existing['bac_water_ml'] - $bacWaterMl) > 1e-9;
@@ -263,8 +252,7 @@ final class CompoundService
                 compounded_at = :compounded_at,
                 notes = :notes,
                 bac_bottle_id = :bac_bottle_id,
-                name = :name,
-                is_open = :is_open
+                name = :name
              WHERE id = :id'
         );
         $stmt->execute([
@@ -278,7 +266,6 @@ final class CompoundService
             ':notes' => $notes,
             ':bac_bottle_id' => $bottleId,
             ':name' => $name,
-            ':is_open' => $isOpen ? 1 : 0,
         ]);
 
         if ($mixChanged) {
@@ -345,20 +332,7 @@ final class CompoundService
     public function archive(PDO $pdo, string $id): array
     {
         $existing = $this->get($pdo, $id);
-        if ($existing['archived_at'] !== null) {
-            throw new ValidationException(['id' => [DoseConfig::ALREADY_ARCHIVED]], DoseConfig::ALREADY_ARCHIVED);
-        }
-        if (!$this->doses->isDepleted((float) $existing['remaining_mg'])) {
-            throw new ValidationException(['id' => [DoseConfig::ARCHIVE_NOT_EMPTY]], DoseConfig::ARCHIVE_NOT_EMPTY);
-        }
-
-        $stmt = $pdo->prepare(
-            'UPDATE compounds SET archived_at = :archived_at, is_open = 0 WHERE id = :id'
-        );
-        $stmt->execute([
-            ':id' => $id,
-            ':archived_at' => $this->timestamp(),
-        ]);
+        $this->archivePolicy->apply(new CompoundStock($pdo, $existing), $this->clock);
 
         return $this->get($pdo, $id);
     }
@@ -388,7 +362,7 @@ final class CompoundService
     private function currentRow(PDO $pdo): ?array
     {
         $stmt = $pdo->query(
-            'SELECT * FROM compounds WHERE is_open = 1 AND archived_at IS NULL ORDER BY compounded_at DESC, id DESC LIMIT 1'
+            'SELECT * FROM compounds WHERE archived_at IS NULL ORDER BY compounded_at DESC, id DESC LIMIT 1'
         );
         $row = $stmt === false ? false : $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -426,14 +400,15 @@ final class CompoundService
             (float) $syringe['capacity_iu'],
             $adjustmentMg,
         );
+        $archivedAt = !isset($row['archived_at']) || $row['archived_at'] === null || $row['archived_at'] === ''
+            ? null
+            : (string) $row['archived_at'];
 
         return [
             'id' => $id,
             'name' => (string) $row['name'],
-            'is_open' => (int) $row['is_open'] === 1,
-            'archived_at' => !isset($row['archived_at']) || $row['archived_at'] === null || $row['archived_at'] === ''
-                ? null
-                : (string) $row['archived_at'],
+            'is_open' => $archivedAt === null,
+            'archived_at' => $archivedAt,
             'peptide_type_id' => (string) $row['peptide_type_id'],
             'peptide_type_slug' => (string) $row['peptide_type_slug'],
             'peptide_type_name' => (string) $row['peptide_type_name'],
@@ -504,20 +479,6 @@ final class CompoundService
         }
 
         return $name;
-    }
-
-    private function vialOpen(FieldParser $fields, bool $fallback): bool
-    {
-        if (!$fields->has('is_open')) {
-            return $fallback;
-        }
-
-        $open = $fields->optionalBool('is_open');
-        if ($open === null) {
-            throw new ValidationException(['is_open' => [DoseConfig::MUST_BE_BOOLEAN]]);
-        }
-
-        return $open;
     }
 
     private function assertMixFitsUses(PDO $pdo, string $compoundId, float $peptideMg, float $bacWaterMl): void

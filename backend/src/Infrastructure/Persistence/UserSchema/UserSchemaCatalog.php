@@ -27,6 +27,7 @@ final class UserSchemaCatalog
             new AddNamedOpenVials($dir),
             new AddArchiveAndAdjustments($dir),
             new AddProfiles($dir),
+            new AddSyringeArchive($dir),
         ]));
     }
 

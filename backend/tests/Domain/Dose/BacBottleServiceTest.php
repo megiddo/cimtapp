@@ -6,6 +6,7 @@ namespace Tests\Domain\Dose;
 
 use App\Domain\Auth\IdGenerator;
 use App\Domain\Auth\ValidationException;
+use App\Domain\Dose\ArchivePolicy;
 use App\Domain\Dose\BacBottleService;
 use App\Domain\Dose\DoseCalculator;
 use App\Domain\Dose\DoseConfig;
@@ -110,7 +111,14 @@ class BacBottleServiceTest extends TestCase
 
     private function service(): BacBottleService
     {
-        return new BacBottleService(new DoseCalculator(), new IdGenerator(), FrozenClock::at('2026-08-20T15:00:00Z'));
+        $doses = new DoseCalculator();
+
+        return new BacBottleService(
+            $doses,
+            new IdGenerator(),
+            FrozenClock::at('2026-08-20T15:00:00Z'),
+            new ArchivePolicy($doses),
+        );
     }
 
     private function pdo(): PDO

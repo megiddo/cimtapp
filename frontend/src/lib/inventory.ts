@@ -15,6 +15,7 @@ export type Syringe = {
   capacity_iu: number;
   is_default: boolean;
   quantity: number;
+  archived_at: string | null;
 };
 
 export type BacBottle = {
@@ -126,8 +127,13 @@ export async function createPeptideType(
   return asResult(payload, 'Unable to add peptide.');
 }
 
-export async function fetchSyringes(baseUrl = ''): Promise<Syringe[]> {
-  const payload = await readAction<Syringe[]>('/api/v1/syringes', { baseUrl });
+function inventoryListPath(resource: 'syringes' | 'compounds' | 'bac-bottles', view?: 'all'): string {
+  const path = `/api/v1/${resource}`;
+  return view === 'all' ? `${path}?view=all` : path;
+}
+
+export async function fetchSyringes(baseUrl = '', view?: 'all'): Promise<Syringe[]> {
+  const payload = await readAction<Syringe[]>(inventoryListPath('syringes', view), { baseUrl });
   return Array.isArray(payload.data) ? payload.data : [];
 }
 
@@ -139,8 +145,8 @@ export async function fetchSyringe(id: string, baseUrl = ''): Promise<Syringe | 
   return payload.data ?? null;
 }
 
-export async function fetchCompounds(baseUrl = ''): Promise<Compound[]> {
-  const payload = await readAction<Compound[]>('/api/v1/compounds', { baseUrl });
+export async function fetchCompounds(baseUrl = '', view?: 'all'): Promise<Compound[]> {
+  const payload = await readAction<Compound[]>(inventoryListPath('compounds', view), { baseUrl });
   return Array.isArray(payload.data) ? payload.data : [];
 }
 
@@ -165,8 +171,8 @@ export async function fetchCurrentCompound(baseUrl = ''): Promise<Compound | nul
   return payload.data ?? null;
 }
 
-export async function fetchBacBottles(baseUrl = ''): Promise<BacBottle[]> {
-  const payload = await readAction<BacBottle[]>('/api/v1/bac-bottles', { baseUrl });
+export async function fetchBacBottles(baseUrl = '', view?: 'all'): Promise<BacBottle[]> {
+  const payload = await readAction<BacBottle[]>(inventoryListPath('bac-bottles', view), { baseUrl });
   return Array.isArray(payload.data) ? payload.data : [];
 }
 
@@ -496,6 +502,16 @@ export async function burnSyringe(
     body: JSON.stringify({ count })
   });
   return asResult(payload, 'Unable to burn syringes.');
+}
+
+export async function archiveSyringe(id: string, baseUrl = ''): Promise<DomainResult<Syringe>> {
+  const payload = await readAction<Syringe>(`/api/v1/syringes/${id}/archive`, {
+    baseUrl,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  return asResult(payload, 'Unable to archive syringe.');
 }
 
 export async function fetchProfiles(baseUrl = ''): Promise<Profile[]> {

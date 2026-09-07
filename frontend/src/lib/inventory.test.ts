@@ -35,6 +35,7 @@ import {
   burnBacBottle,
   archiveBacBottle,
   archiveCompound,
+  archiveSyringe,
   adjustCompound,
   fetchProfiles,
   createProfile,
@@ -183,15 +184,18 @@ describe('inventory API client', () => {
 
   it('picks last-used syringe then default then first', () => {
     const syringes = [
-      { id: 'a', label: 'A', volume_ml: 0.5, capacity_iu: 50, is_default: false, quantity: 4 },
-      { id: 'b', label: 'B', volume_ml: 1, capacity_iu: 40, is_default: true, quantity: 8 }
+      { id: 'a', label: 'A', volume_ml: 0.5, capacity_iu: 50, is_default: false, quantity: 4, archived_at: null },
+      { id: 'b', label: 'B', volume_ml: 1, capacity_iu: 40, is_default: true, quantity: 8, archived_at: null }
     ];
     expect(defaultSyringeId(syringes, 'a')).toBe('a');
     expect(defaultSyringeId(syringes, 'missing')).toBe('b');
     expect(defaultSyringeId(syringes, null)).toBe('b');
     expect(defaultSyringeId([], null)).toBe('');
     expect(
-      defaultSyringeId([{ id: 'z', label: 'Z', volume_ml: 1, capacity_iu: 1, is_default: false, quantity: 0 }], null)
+      defaultSyringeId(
+        [{ id: 'z', label: 'Z', volume_ml: 1, capacity_iu: 1, is_default: false, quantity: 0, archived_at: null }],
+        null
+      )
     ).toBe('z');
   });
 
@@ -538,6 +542,14 @@ describe('inventory API client', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValueOnce(
+        jsonResponse(200, { statusCode: 200, data: { id: 's1', archived_at: '2026-08-27T16:00:00Z', quantity: 0 } })
+      )
+    );
+    await expect(archiveSyringe('s1')).resolves.toMatchObject({ ok: true, status: 200 });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
         jsonResponse(422, {
           statusCode: 422,
           error: {
@@ -549,6 +561,29 @@ describe('inventory API client', () => {
       )
     );
     await expect(archiveCompound('c1')).resolves.toMatchObject({ ok: false, status: 422 });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(422, {
+          statusCode: 422,
+          error: {
+            type: 'VALIDATION_ERROR',
+            description: 'Archive is available when remaining is 0.',
+            fields: { id: ['Archive is available when remaining is 0.'] }
+          }
+        })
+      )
+    );
+    const blockedSyringe = await archiveSyringe('s1');
+    expect(blockedSyringe).toMatchObject({
+      ok: false,
+      status: 422,
+      message: 'Archive is available when remaining is 0.'
+    });
+    if (!blockedSyringe.ok) {
+      expect(blockedSyringe.fields.id[0]).toBe('Archive is available when remaining is 0.');
+    }
   });
 
   it('lists and mutates profiles and filters uses by profile', async () => {
@@ -740,6 +775,26 @@ describe('inventory client contracts', () => {
     }
   });
 
+  it('appends view=all for full inventory lists and prefixes the origin', async () => {
+    const allViews: Array<{ run: () => Promise<unknown>; url: string }> = [
+      { run: () => fetchSyringes(ORIGIN, 'all'), url: `${ORIGIN}/api/v1/syringes?view=all` },
+      { run: () => fetchCompounds(ORIGIN, 'all'), url: `${ORIGIN}/api/v1/compounds?view=all` },
+      { run: () => fetchBacBottles(ORIGIN, 'all'), url: `${ORIGIN}/api/v1/bac-bottles?view=all` },
+      { run: () => fetchSyringes('', 'all'), url: '/api/v1/syringes?view=all' },
+      { run: () => fetchCompounds('', 'all'), url: '/api/v1/compounds?view=all' },
+      { run: () => fetchBacBottles('', 'all'), url: '/api/v1/bac-bottles?view=all' }
+    ];
+    for (const item of allViews) {
+      const fetchMock = stubPayload(200, { statusCode: 200, data: [] });
+      await item.run();
+      expect(fetchMock.mock.calls[0][0]).toBe(item.url);
+    }
+
+    const ignoredView = stubPayload(200, { statusCode: 200, data: [] });
+    await fetchSyringes('', 'open' as 'all');
+    expect(ignoredView.mock.calls[0][0]).toBe('/api/v1/syringes');
+  });
+
   it('posts and patches with exact paths, JSON bodies, and fallback copy', async () => {
     const writes: Array<{
       run: () => Promise<{ ok: boolean; message?: string }>;
@@ -901,6 +956,13 @@ describe('inventory client contracts', () => {
         method: 'POST',
         body: { count: 2 },
         fallback: 'Unable to burn syringes.'
+      },
+      {
+        run: () => archiveSyringe('s1', ORIGIN),
+        url: `${ORIGIN}/api/v1/syringes/s1/archive`,
+        method: 'POST',
+        body: {},
+        fallback: 'Unable to archive syringe.'
       },
       {
         run: () => createProfile({ name: 'Sam' }, ORIGIN),

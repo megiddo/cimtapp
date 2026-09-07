@@ -17,21 +17,26 @@ final class BacBottleService
         private readonly DoseCalculator $doses,
         private readonly IdGenerator $ids,
         private readonly Clock $clock,
+        private readonly ArchivePolicy $archivePolicy,
     ) {
     }
 
     /**
      * @return list<array<string, mixed>>
      */
-    public function list(PDO $pdo): array
+    public function list(PDO $pdo, ?StockList $query = null): array
     {
+        $query ??= StockList::openOnly();
         $currentId = $this->currentId($pdo);
-        $stmt = $pdo->query(
-            'SELECT id, volume_ml, remaining_ml, opened_at, notes, created_at, archived_at
-             FROM bac_bottles
-             WHERE archived_at IS NULL
-             ORDER BY opened_at DESC, id DESC'
-        );
+        $sql = $query->includesArchived()
+            ? 'SELECT id, volume_ml, remaining_ml, opened_at, notes, created_at, archived_at
+               FROM bac_bottles
+               ORDER BY (archived_at IS NULL) DESC, opened_at DESC, id DESC'
+            : 'SELECT id, volume_ml, remaining_ml, opened_at, notes, created_at, archived_at
+               FROM bac_bottles
+               WHERE archived_at IS NULL
+               ORDER BY opened_at DESC, id DESC';
+        $stmt = $pdo->query($sql);
         $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_values(array_map(
@@ -149,18 +154,7 @@ final class BacBottleService
     public function archive(PDO $pdo, string $id): array
     {
         $existing = $this->get($pdo, $id);
-        if ($existing['archived_at'] !== null) {
-            throw new ValidationException(['id' => [DoseConfig::ALREADY_ARCHIVED]], DoseConfig::ALREADY_ARCHIVED);
-        }
-        if (!$this->doses->isDepleted((float) $existing['remaining_ml'])) {
-            throw new ValidationException(['id' => [DoseConfig::ARCHIVE_NOT_EMPTY]], DoseConfig::ARCHIVE_NOT_EMPTY);
-        }
-
-        $stmt = $pdo->prepare('UPDATE bac_bottles SET archived_at = :archived_at WHERE id = :id');
-        $stmt->execute([
-            ':id' => $id,
-            ':archived_at' => $this->timestamp(),
-        ]);
+        $this->archivePolicy->apply(new BacStock($pdo, $existing), $this->clock);
 
         return $this->get($pdo, $id);
     }

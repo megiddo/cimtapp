@@ -7,6 +7,7 @@ namespace App\Application\Actions\Compounds;
 use App\Application\Actions\AuthenticatedAction;
 use App\Domain\Auth\UserStorePort;
 use App\Domain\Dose\CompoundService;
+use App\Domain\Dose\StockList;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Log\LoggerInterface;
 
@@ -22,6 +23,8 @@ final class ListCompoundsAction extends AuthenticatedAction
 
     protected function action(): Response
     {
-        return $this->respondWithData($this->compounds->list($this->userPdo()));
+        return $this->respondWithData(
+            $this->compounds->list($this->userPdo(), StockList::fromQuery($this->request->getQueryParams())),
+        );
     }
 }

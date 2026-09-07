@@ -8,6 +8,7 @@ use App\Domain\Auth\IdGenerator;
 use App\Domain\Auth\ValidationException;
 use App\Domain\Dose\DoseConfig;
 use App\Domain\Dose\FieldParser;
+use App\Domain\Dose\StockList;
 use App\Domain\Dose\SyringeService;
 use PDO;
 use Tests\TestCase;
@@ -25,7 +26,8 @@ class SyringeServiceTest extends TestCase
                 volume_ml REAL NOT NULL,
                 capacity_iu REAL NOT NULL,
                 is_default INTEGER NOT NULL DEFAULT 0,
-                quantity INTEGER NOT NULL DEFAULT 0
+                quantity INTEGER NOT NULL DEFAULT 0,
+                archived_at TEXT
             )'
         );
         $pdo->exec("INSERT INTO syringe_profiles (id, label, volume_ml, capacity_iu, is_default, quantity)
@@ -74,7 +76,8 @@ class SyringeServiceTest extends TestCase
                 volume_ml REAL NOT NULL,
                 capacity_iu REAL NOT NULL,
                 is_default INTEGER NOT NULL DEFAULT 0,
-                quantity INTEGER NOT NULL DEFAULT 0
+                quantity INTEGER NOT NULL DEFAULT 0,
+                archived_at TEXT
             )'
         );
         $pdo->exec("INSERT INTO syringe_profiles (id, label, volume_ml, capacity_iu, is_default, quantity)
@@ -92,5 +95,58 @@ class SyringeServiceTest extends TestCase
         } catch (ValidationException $e) {
             $this->assertSame(['syringe_id' => [DoseConfig::SYRINGE_STOCK_EMPTY]], $e->fields());
         }
+    }
+
+    public function testDeleteCountsArchivedTypesAndDefaultSkipsThem(): void
+    {
+        $pdo = $this->pdo();
+        $pdo->exec("INSERT INTO syringe_profiles (id, label, volume_ml, capacity_iu, is_default, quantity, archived_at)
+                    VALUES ('s1', '0.5 mL / 50 IU', 0.5, 50, 1, 0, '2026-08-20T15:00:00Z')");
+        $service = new SyringeService(new IdGenerator());
+        $open = $service->create($pdo, FieldParser::from([
+            'volume_ml' => 1,
+            'capacity_iu' => 40,
+            'label' => 'open',
+        ]));
+
+        $this->assertCount(1, $service->list($pdo));
+        $this->assertSame($open['id'], $service->list($pdo)[0]['id']);
+        $this->assertSame(
+            [$open['id'], 's1'],
+            array_column($service->list($pdo, StockList::allGrouped()), 'id'),
+        );
+        $this->assertSame($open['id'], $service->defaultSyringe($pdo)['id']);
+        $this->assertNull($service->fallbackProfile()['archived_at']);
+
+        $service->delete($pdo, $open['id']);
+        $this->assertSame([], $service->list($pdo));
+        $this->assertSame('s1', $service->list($pdo, StockList::allGrouped())[0]['id']);
+        $this->assertNull($service->defaultSyringe($pdo)['id']);
+
+        try {
+            $service->delete($pdo, 's1');
+            $this->fail('expected last syringe delete to fail');
+        } catch (ValidationException $e) {
+            $this->assertSame(['id' => [DoseConfig::SYRINGE_LAST]], $e->fields());
+        }
+    }
+
+    private function pdo(): PDO
+    {
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->exec(
+            'CREATE TABLE syringe_profiles (
+                id TEXT PRIMARY KEY NOT NULL,
+                label TEXT NOT NULL,
+                volume_ml REAL NOT NULL,
+                capacity_iu REAL NOT NULL,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                quantity INTEGER NOT NULL DEFAULT 0,
+                archived_at TEXT
+            )'
+        );
+
+        return $pdo;
     }
 }
