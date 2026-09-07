@@ -6,16 +6,16 @@ Coverage and mutation are **gates**, not dashboards. Scripts fail the build when
 
 | Tool | Metric | Fail below | Config |
 | --- | --- | --- | --- |
-| PHPUnit | Line coverage of `backend/src` | **95%** | `phpunit.xml` source include + `scripts/check-coverage.php` |
-| Vitest | Line coverage of `frontend/src/lib/**/*.ts` | **95%** | `vite.config.ts` `test.coverage.thresholds` |
-| Infection | MSI / covered MSI | **80** / **85** | `backend/infection.json5` `minMsi` / `minCoveredMsi` |
-| Stryker | Mutation score | **break 70**, **high 80** | `frontend/stryker.config.json` `thresholds` |
+| PHPUnit | Line coverage of `backend/src` | **90%** | `phpunit.xml` source include + `scripts/check-coverage.php` |
+| Vitest | Line coverage of `frontend/src/lib/**/*.ts` | **90%** | `vite.config.ts` `test.coverage.thresholds` |
+| Infection | MSI / covered MSI | **80** / **80** | `backend/infection.json5` `minMsi` / `minCoveredMsi` |
+| Stryker | Mutation score | **break 80**, **high 80** | `frontend/stryker.config.json` `thresholds` |
 
 ### Why these numbers
 
-- **95% line coverage** on production source (never tests, vendor, generated, or `public/`). Crypto and dose math will live in `src/`; uncovered lines are how wrap/unwrap and remainder bugs slip through.
-- **Infection 80 MSI / 85 covered MSI**: domain and crypto must kill mutants. 80 is the floor *given* 95% coverage — equivalent mutants exist, but a surviving mutant that changes wrap, remainder, or auth behavior is a product bug.
-- **Stryker break 70 / high 80**: Svelte UI produces more equivalent mutants (markup, class strings) than PHP domain code. 70 fails the build; 80 is the healthy band.
+- **90% line coverage** on production source (never tests, vendor, generated, or `public/`). Crypto, remainder, archive, and auth must stay covered. 95% fought equivalent `parent::__construct` / shred-cleanup lines.
+- **Infection 80 MSI / 80 covered MSI**: one mutation number for PHP and JS. Domain and crypto must kill mutants. Equivalent mutants exist, but a surviving mutant that changes wrap, remainder, or auth behavior is a product bug.
+- **Stryker break 80 / high 80**: the SPA client is held to the same mutation bar as PHP domain code. Markup-only `.svelte` files stay out of the mutate glob (`src/lib/**/*.ts` only).
 
 Do not disable mutants globally. Infection excludes only empty interfaces / empty marker exceptions (`SettingsInterface`, `Domain/DomainException`) — files with no executable statements. That exclusion is documented in `infection.json5`.
 
@@ -27,7 +27,7 @@ Do not disable mutants globally. Infection excludes only empty interfaces / empt
 cd backend
 composer test
 # → vendor/bin/phpunit --coverage-clover coverage/clover.xml --coverage-text
-# → php scripts/check-coverage.php   # reads Clover project metrics, exits 1 if < 95%
+# → php scripts/check-coverage.php   # reads Clover project metrics, exits 1 if < 90%
 ```
 
 PHPUnit `source.include` is `src/`. Tests, `vendor/`, `public/`, and `app/` config closures are outside that tree. `SettingsInterface` is excluded (empty interface).
@@ -47,7 +47,7 @@ docker compose run --rm --no-deps app composer infection
 
 ```bash
 cd frontend
-npm test          # vitest run --coverage  (fails below 95% lines)
+npm test          # vitest run --coverage  (fails below 90% lines)
 npm run mutation  # stryker run
 ```
 

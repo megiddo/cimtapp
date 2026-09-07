@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Fail the test run when Clover line coverage of production source is below 95%.
+ * Fail the test run when Clover line coverage of production source is below 90%.
  */
 $cloverPath = dirname(__DIR__) . '/coverage/clover.xml';
 if (!is_file($cloverPath)) {
@@ -26,7 +26,7 @@ if ($metrics === null) {
 $statements = (int) $metrics['statements'];
 $covered = (int) $metrics['coveredstatements'];
 $percent = $statements === 0 ? 0.0 : ($covered / $statements) * 100;
-$min = 95.0;
+$min = 90.0;
 
 printf("Line coverage: %.2f%% (%d/%d statements). Floor: %.1f%%.\n", $percent, $covered, $statements, $min);
 

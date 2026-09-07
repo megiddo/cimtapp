@@ -87,4 +87,24 @@ describe('parseActionPayload', () => {
     expect(payload.error?.description).toBeNull();
     expect(payload.error?.fields).toBeUndefined();
   });
+
+  it('keeps httpStatus when statusCode is not a number and ignores non-finite remaining_iu', () => {
+    expect(parseActionPayload({ statusCode: '500', data: 1 }, 201).statusCode).toBe(201);
+    expect('data' in parseActionPayload({ statusCode: 200 }, 200)).toBe(false);
+    expect(
+      parseActionPayload({
+        statusCode: 422,
+        error: { type: 'VALIDATION_ERROR', description: 'x', remaining_iu: Number.POSITIVE_INFINITY }
+      }).error?.remaining_iu
+    ).toBeUndefined();
+    expect(fieldErrorsFrom({ statusCode: 500 })).toEqual({});
+    expect(parseFieldMap({ email: ['ok', 1] })).toBeUndefined();
+    expect(isUnauthenticated({ statusCode: 200, error: { type: 'UNAUTHENTICATED', description: null } })).toBe(true);
+    expect(isUnauthenticated({ statusCode: 403, error: { type: 'FORBIDDEN', description: null } })).toBe(false);
+    expect(isValidationError({ statusCode: 400, error: { type: 'VALIDATION_ERROR', description: null } })).toBe(true);
+    expect(isValidationError({ statusCode: 400, error: { type: 'BAD_REQUEST', description: null } })).toBe(false);
+    expect(genericErrorMessage({ statusCode: 500, error: { type: 'SERVER_ERROR', description: '' } }, 'fallback')).toBe(
+      'fallback'
+    );
+  });
 });

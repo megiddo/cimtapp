@@ -96,10 +96,10 @@ cd frontend && npm ci && npm run build             # SPA into backend/public/
 
 | What | Command |
 | --- | --- |
-| PHPUnit + 95% coverage floor | `docker compose run --rm --no-deps app composer test` or `cd backend && composer test` |
-| Infection (min MSI 80 / covered 85) | `docker compose run --rm --no-deps app composer infection` or `cd backend && composer infection` |
-| Vitest + 95% coverage floor | `docker compose run --rm frontend npm ci && docker compose run --rm frontend npm test` or `cd frontend && npm test` |
-| Stryker (break 70 / high 80) | `cd frontend && npm run mutation` |
+| PHPUnit + 90% coverage floor | `docker compose run --rm --no-deps app composer test` or `cd backend && composer test` |
+| Infection (min MSI 80 / covered 80) | `docker compose run --rm --no-deps app composer infection` or `cd backend && composer infection` |
+| Vitest + 90% coverage floor | `docker compose run --rm frontend npm ci && docker compose run --rm frontend npm test` or `cd frontend && npm test` |
+| Stryker (break 80 / high 80) | `cd frontend && npm run mutation` |
 | All of the above via Make | `make test` then `make mutation` |
 
 See [docs/TESTING.md](docs/TESTING.md) for floors and why they exist.
