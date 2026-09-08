@@ -1,0 +1,93 @@
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.modal-backdrop-hit {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.modal-sheet {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--content-max);
+  padding: 1rem 1.25rem calc(1rem + env(safe-area-inset-bottom));
+  background: var(--paper);
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.modal-sheet .day-heading {
+  margin: 0 0 0.25rem;
+}
+
+.chooser-option {
+  box-sizing: border-box;
+  min-height: var(--tap-min);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 650;
+}
+
+.modal-sheet button.secondary {
+  margin-top: 0.25rem;
+}
+
+.modal-sheet.calculator {
+  max-height: min(90dvh, 760px);
+  overflow-y: auto;
+}
+
+.calc-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.result-card {
+  margin: 0.25rem 0 0.5rem;
+  padding: 1rem;
+  border: 1px solid #c5d4cc;
+  border-radius: 12px;
+  background: #fff;
+  text-align: center;
+}
+
+.result-title {
+  font-size: 0.8rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #555;
+}
+
+.result-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.result-unit {
+  font-size: 1rem;
+  font-weight: 650;
+  color: #555;
+}

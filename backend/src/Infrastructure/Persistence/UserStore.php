@@ -6,7 +6,6 @@ namespace App\Infrastructure\Persistence;
 
 use App\Domain\Auth\UserStorePort;
 use App\Domain\Crypto\Crypto;
-use App\Domain\Crypto\CryptoException;
 use PDO;
 
 /**
@@ -16,7 +15,10 @@ use PDO;
 final class UserStore implements UserStorePort
 {
     private const USER_ID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
-    private const LOCK_POLL_MICROS = 10_000;
+
+    private readonly ExclusiveUserLock $lock;
+    private readonly UserStoreCipherSession $cipher;
+    private readonly PreMigrationBackup $backup;
 
     public function __construct(
         private readonly Crypto $crypto,
@@ -27,6 +29,9 @@ final class UserStore implements UserStorePort
         if ($this->lockTimeoutMs < 1) {
             throw new UserStoreException('Lock timeout must be at least 1 ms.');
         }
+        $this->backup = new PreMigrationBackup($this->paths);
+        $this->lock = new ExclusiveUserLock($this->paths, $this->lockTimeoutMs);
+        $this->cipher = new UserStoreCipherSession($this->crypto, $this->paths, $this->backup);
     }
 
     public function create(string $userId, string $dek): void
@@ -34,23 +39,19 @@ final class UserStore implements UserStorePort
         $this->assertUserId($userId);
         $this->paths->ensure();
 
-        $this->withLock($userId, function () use ($userId, $dek): void {
+        $this->lock->withLock($userId, function () use ($userId, $dek): void {
             $encPath = $this->paths->userEnc($userId);
             if (is_file($encPath)) {
                 throw new UserStoreException('User store already exists.');
             }
 
-            $plainPath = $this->uniquePlainPath($userId);
+            $plainPath = $this->cipher->uniquePlainPath($userId);
             $staging = $this->paths->userEncStaging($userId);
             try {
                 $this->userMigrator->migrate($plainPath);
-                $this->crypto->encryptFile($plainPath, $staging, $dek);
-                if (!@rename($staging, $encPath)) {
-                    throw new UserStoreException('Failed to persist user store.');
-                }
+                $this->cipher->encryptReplace($plainPath, $staging, $encPath, $dek);
             } finally {
-                $this->shred($plainPath);
-                $this->unlinkIfExists($staging);
+                $this->cipher->cleanup($plainPath, $staging);
             }
         });
     }
@@ -65,42 +66,33 @@ final class UserStore implements UserStorePort
         $this->assertUserId($userId);
         $this->paths->ensure();
 
-        return $this->withLock($userId, function () use ($userId, $dek, $callback): mixed {
+        return $this->lock->withLock($userId, function () use ($userId, $dek, $callback): mixed {
             $encPath = $this->paths->userEnc($userId);
             if (!is_file($encPath)) {
                 throw new UserStoreException('User store not found.');
             }
 
-            $plainPath = $this->uniquePlainPath($userId);
+            $plainPath = $this->cipher->uniquePlainPath($userId);
             $staging = $this->paths->userEncStaging($userId);
 
-            try {
-                $this->crypto->decryptFile($encPath, $plainPath, $dek);
-            } catch (CryptoException $e) {
-                $this->shred($plainPath);
-                throw $e;
-            }
+            $this->cipher->decryptToPlain($encPath, $plainPath, $dek);
 
             try {
                 $applied = $this->userMigrator->migrate($plainPath);
-                $this->snapshotEncIfNeeded($encPath, $userId, $applied);
-                $pdo = $this->openPdo($plainPath);
+                $this->backup->snapshotEncIfNeeded($encPath, $userId, $applied);
+                $pdo = $this->cipher->openPdo($plainPath);
                 $result = $callback($pdo);
             } catch (\Throwable $e) {
                 $pdo = null;
-                $this->shred($plainPath);
+                $this->cipher->shred($plainPath);
                 throw $e;
             }
 
             $pdo = null;
             try {
-                $this->crypto->encryptFile($plainPath, $staging, $dek);
-                if (!@rename($staging, $encPath)) {
-                    throw new UserStoreException('Failed to persist user store.');
-                }
+                $this->cipher->encryptReplace($plainPath, $staging, $encPath, $dek);
             } finally {
-                $this->shred($plainPath);
-                $this->unlinkIfExists($staging);
+                $this->cipher->cleanup($plainPath, $staging);
             }
 
             return $result;
@@ -117,33 +109,29 @@ final class UserStore implements UserStorePort
         $this->assertUserId($userId);
         $this->paths->ensure();
 
-        return $this->withLock($userId, function () use ($userId, $dek): string {
+        return $this->lock->withLock($userId, function () use ($userId, $dek): string {
             $encPath = $this->paths->userEnc($userId);
             if (!is_file($encPath)) {
                 throw new UserStoreException('User store not found.');
             }
 
-            $plainPath = $this->uniquePlainPath($userId);
+            $plainPath = $this->cipher->uniquePlainPath($userId);
             $staging = $this->paths->userEncStaging($userId);
             try {
-                $this->crypto->decryptFile($encPath, $plainPath, $dek);
+                $this->cipher->decryptToPlain($encPath, $plainPath, $dek);
                 $applied = $this->userMigrator->migrate($plainPath);
-                $this->snapshotEncIfNeeded($encPath, $userId, $applied);
+                $this->backup->snapshotEncIfNeeded($encPath, $userId, $applied);
                 $bytes = file_get_contents($plainPath);
                 if (!is_string($bytes) || $bytes === '') {
                     throw new UserStoreException('Unable to export user store.');
                 }
                 if ($applied > 0) {
-                    $this->crypto->encryptFile($plainPath, $staging, $dek);
-                    if (!@rename($staging, $encPath)) {
-                        throw new UserStoreException('Failed to persist user store.');
-                    }
+                    $this->cipher->encryptReplace($plainPath, $staging, $encPath, $dek);
                 }
 
                 return $bytes;
             } finally {
-                $this->shred($plainPath);
-                $this->unlinkIfExists($staging);
+                $this->cipher->cleanup($plainPath, $staging);
             }
         });
     }
@@ -152,7 +140,7 @@ final class UserStore implements UserStorePort
     {
         $this->assertUserId($userId);
 
-        return is_file($this->paths->userEncBackup($userId));
+        return $this->backup->exists($userId);
     }
 
     /**
@@ -164,117 +152,15 @@ final class UserStore implements UserStorePort
         $this->assertUserId($userId);
         $this->paths->ensure();
 
-        $this->withLock($userId, function () use ($userId): void {
-            $bakPath = $this->paths->userEncBackup($userId);
-            if (!is_file($bakPath)) {
-                throw new UserStoreException('Pre-migration backup not found.');
-            }
-
-            $encPath = $this->paths->userEnc($userId);
-            $staging = $this->paths->userEncStaging($userId);
-            $this->copyAtomic($bakPath, $staging, $encPath, 'Failed to restore user store.');
+        $this->lock->withLock($userId, function () use ($userId): void {
+            $this->backup->restore($userId);
         });
-    }
-
-    /**
-     * @template T
-     * @param callable(): T $callback
-     * @return T
-     */
-    private function withLock(string $userId, callable $callback): mixed
-    {
-        $lockPath = $this->paths->userLock($userId);
-        $handle = @fopen($lockPath, 'c+');
-        if ($handle === false) {
-            throw new UserStoreException('Unable to open user store lock.');
-        }
-
-        $deadline = microtime(true) + ($this->lockTimeoutMs / 1000);
-        $locked = false;
-        try {
-            while (!($locked = flock($handle, LOCK_EX | LOCK_NB))) {
-                if (microtime(true) >= $deadline) {
-                    throw new UserStoreLockedException();
-                }
-                usleep(self::LOCK_POLL_MICROS);
-            }
-
-            return $callback();
-        } finally {
-            if ($locked) {
-                flock($handle, LOCK_UN);
-            }
-            fclose($handle);
-        }
-    }
-
-    private function openPdo(string $plainPath): PDO
-    {
-        $pdo = new PDO('sqlite:' . $plainPath, null, null, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        ]);
-        $pdo->exec('PRAGMA foreign_keys = ON');
-
-        return $pdo;
-    }
-
-    private function uniquePlainPath(string $userId): string
-    {
-        return $this->paths->tmpDir() . '/' . $userId . '-' . bin2hex(random_bytes(8)) . '.sqlite';
     }
 
     private function assertUserId(string $userId): void
     {
         if (preg_match(self::USER_ID_PATTERN, $userId) !== 1) {
             throw new UserStoreException('User id must be a UUID.');
-        }
-    }
-
-    private function snapshotEncIfNeeded(string $encPath, string $userId, int $applied): void
-    {
-        if ($applied < 1 || !is_file($encPath)) {
-            return;
-        }
-
-        $bakPath = $this->paths->userEncBackup($userId);
-        if (is_file($bakPath)) {
-            return;
-        }
-
-        $staging = $this->paths->userEncBackupStaging($userId);
-        $this->copyAtomic($encPath, $staging, $bakPath, 'Failed to snapshot user store.');
-    }
-
-    private function copyAtomic(string $from, string $staging, string $to, string $failureMessage): void
-    {
-        if (!@copy($from, $staging) || !@rename($staging, $to)) {
-            $this->unlinkIfExists($staging);
-            throw new UserStoreException($failureMessage);
-        }
-    }
-
-    private function shred(string $path): void
-    {
-        if (!is_file($path)) {
-            return;
-        }
-
-        $size = filesize($path);
-        if (is_int($size) && $size > 0) {
-            $handle = fopen($path, 'r+b');
-            if ($handle !== false) {
-                fwrite($handle, str_repeat("\0", $size));
-                fclose($handle);
-            }
-        }
-
-        unlink($path);
-    }
-
-    private function unlinkIfExists(string $path): void
-    {
-        if (is_file($path)) {
-            unlink($path);
         }
     }
 }

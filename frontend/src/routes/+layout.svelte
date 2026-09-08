@@ -1,10 +1,10 @@
 <script lang="ts">
   import { page } from '$app/state';
   import '../app.css';
+  import TabBar from '$lib/chrome/TabBar.svelte';
+  import TopBar from '$lib/chrome/TopBar.svelte';
   import {
-    NAV_TABS,
     backHrefForPath,
-    isTabActive,
     needsStickyCta,
     showsSettingsLink,
     showsTabBar,
@@ -22,32 +22,13 @@
 </script>
 
 <div class="app-shell" class:with-tabs={tabsVisible}>
-  <header class="top-bar">
-    {#if backHref}
-      <a class="back" href={backHref} aria-label="Back">‹</a>
-    {/if}
-    <h1>{title}</h1>
-    {#if settingsVisible}
-      <a class="gear" href="/settings" aria-label="Settings">Settings</a>
-    {/if}
-  </header>
+  <TopBar {title} {backHref} {settingsVisible} />
 
   <main class:has-sticky={sticky}>
     {@render children()}
   </main>
 
   {#if tabsVisible}
-    <nav class="tab-bar" aria-label="Primary">
-      {#each NAV_TABS as tab (tab.id)}
-        <a
-          href={tab.href}
-          class:emphasized={tab.emphasized}
-          class:active={isTabActive(pathname, tab.href)}
-          aria-current={isTabActive(pathname, tab.href) ? 'page' : undefined}
-        >
-          {tab.label}
-        </a>
-      {/each}
-    </nav>
+    <TabBar {pathname} />
   {/if}
 </div>

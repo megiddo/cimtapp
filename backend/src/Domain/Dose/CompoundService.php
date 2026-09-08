@@ -6,23 +6,46 @@ namespace App\Domain\Dose;
 
 use App\Domain\Auth\Clock;
 use App\Domain\Auth\IdGenerator;
-use App\Domain\Auth\ValidationException;
-use App\Domain\DomainException\DomainRecordNotFoundException;
-use DateTimeZone;
 use PDO;
 
 final class CompoundService
 {
+    private readonly CompoundRepository $repository;
+    private readonly CompoundQueryService $queries;
+    private readonly CompoundMixService $mix;
+    private readonly CompoundAdjustmentService $adjustments;
+
     public function __construct(
-        private readonly DoseCalculator $doses,
-        private readonly UserPeptideService $peptides,
-        private readonly SyringeService $syringes,
-        private readonly BacBottleService $bacBottles,
-        private readonly ProfileService $profiles,
-        private readonly IdGenerator $ids,
+        DoseCalculator $doses,
+        UserPeptideService $peptides,
+        SyringeService $syringes,
+        BacBottleService $bacBottles,
+        ProfileService $profiles,
+        IdGenerator $ids,
         private readonly Clock $clock,
         private readonly ArchivePolicy $archivePolicy,
     ) {
+        $this->repository = new CompoundRepository($doses);
+        $presenter = new CompoundPresenter($this->repository, $doses, $profiles);
+        $this->queries = new CompoundQueryService($this->repository, $presenter, $syringes);
+        $this->adjustments = new CompoundAdjustmentService(
+            $this->repository,
+            $this->queries,
+            $doses,
+            $ids,
+            $clock,
+        );
+        $this->mix = new CompoundMixService(
+            $this->repository,
+            $this->queries,
+            $this->adjustments,
+            $doses,
+            $peptides,
+            $bacBottles,
+            $profiles,
+            $ids,
+            $clock,
+        );
     }
 
     /**
@@ -30,58 +53,31 @@ final class CompoundService
      */
     public function list(PDO $pdo, ?StockList $query = null): array
     {
-        $query ??= StockList::openOnly();
-        $sql = $query->includesArchived()
-            ? 'SELECT * FROM compounds ORDER BY (archived_at IS NULL) DESC, compounded_at DESC, id DESC'
-            : 'SELECT * FROM compounds WHERE archived_at IS NULL ORDER BY compounded_at DESC, id DESC';
-        $stmt = $pdo->query($sql);
-        $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $default = $this->syringes->defaultSyringe($pdo);
-
-        return array_values(array_map(
-            fn (array $row): array => $this->present($pdo, $row, $default),
-            is_array($rows) ? $rows : [],
-        ));
+        return $this->queries->list($pdo, $query);
     }
 
     /**
-     * Latest open vial by compounded_at (not created_at). 404 when none.
-     *
      * @return array<string, mixed>
      */
     public function current(PDO $pdo): array
     {
-        $row = $this->currentRow($pdo);
-        if ($row === null) {
-            throw new DomainRecordNotFoundException(DoseConfig::COMPOUND_UNKNOWN);
-        }
-
-        return $this->present($pdo, $row, $this->syringes->defaultSyringe($pdo));
+        return $this->queries->current($pdo);
     }
 
     /**
-     * Open vials, newest mix first.
-     *
      * @return list<array<string, mixed>>
      */
     public function listOpen(PDO $pdo): array
     {
-        return $this->list($pdo, StockList::openOnly());
+        return $this->queries->listOpen($pdo);
     }
 
     /**
-     * Remainder summary for GET /me. Null when no open vial exists.
-     *
      * @return array<string, mixed>|null
      */
     public function currentRemainder(PDO $pdo): ?array
     {
-        $row = $this->currentRow($pdo);
-        if ($row === null) {
-            return null;
-        }
-
-        return $this->remainderSummary($this->present($pdo, $row, $this->syringes->defaultSyringe($pdo)));
+        return $this->queries->currentRemainder($pdo);
     }
 
     /**
@@ -89,10 +85,7 @@ final class CompoundService
      */
     public function openRemainders(PDO $pdo): array
     {
-        return array_map(
-            $this->remainderSummary(...),
-            $this->listOpen($pdo),
-        );
+        return $this->queries->openRemainders($pdo);
     }
 
     /**
@@ -100,12 +93,7 @@ final class CompoundService
      */
     public function get(PDO $pdo, string $id): array
     {
-        $row = $this->findRow($pdo, $id);
-        if ($row === null) {
-            throw new DomainRecordNotFoundException(DoseConfig::COMPOUND_UNKNOWN);
-        }
-
-        return $this->present($pdo, $row, $this->syringes->defaultSyringe($pdo));
+        return $this->queries->get($pdo, $id);
     }
 
     /**
@@ -113,40 +101,22 @@ final class CompoundService
      */
     public function find(PDO $pdo, string $id): ?array
     {
-        $row = $this->findRow($pdo, $id);
-
-        return $row === null ? null : $this->present($pdo, $row, $this->syringes->defaultSyringe($pdo));
+        return $this->queries->find($pdo, $id);
     }
 
     public function usedPeptideMg(PDO $pdo, string $compoundId, ?string $excludeUseId = null): float
     {
-        if ($excludeUseId === null) {
-            $stmt = $pdo->prepare('SELECT COALESCE(SUM(peptide_mg), 0) FROM uses WHERE compound_id = :id');
-            $stmt->execute([':id' => $compoundId]);
-        } else {
-            $stmt = $pdo->prepare(
-                'SELECT COALESCE(SUM(peptide_mg), 0) FROM uses WHERE compound_id = :id AND id != :exclude'
-            );
-            $stmt->execute([':id' => $compoundId, ':exclude' => $excludeUseId]);
-        }
-
-        return $this->doses->roundMg((float) $stmt->fetchColumn());
+        return $this->repository->usedPeptideMg($pdo, $compoundId, $excludeUseId);
     }
 
     public function adjustmentPeptideMg(PDO $pdo, string $compoundId): float
     {
-        $stmt = $pdo->prepare('SELECT COALESCE(SUM(delta_mg), 0) FROM compound_adjustments WHERE compound_id = :id');
-        $stmt->execute([':id' => $compoundId]);
-
-        return $this->doses->roundMg((float) $stmt->fetchColumn());
+        return $this->repository->adjustmentPeptideMg($pdo, $compoundId);
     }
 
     public function hasUses(PDO $pdo, string $compoundId): bool
     {
-        $stmt = $pdo->prepare('SELECT 1 FROM uses WHERE compound_id = :id LIMIT 1');
-        $stmt->execute([':id' => $compoundId]);
-
-        return $stmt->fetchColumn() !== false;
+        return $this->repository->hasUses($pdo, $compoundId);
     }
 
     /**
@@ -154,402 +124,38 @@ final class CompoundService
      */
     public function create(PDO $pdo, FieldParser $fields): array
     {
-        $peptide = $this->peptides->require($pdo, $fields->requireString('peptide_type_id'));
-        $peptideMg = $this->doses->roundMg($fields->requirePositiveFloat('peptide_mg'));
-        $bacWaterMl = $fields->requirePositiveFloat('bac_water_ml');
-        $compoundedAt = $fields->requireDatetime('compounded_at');
-        $notes = $fields->optionalString('notes');
-        $name = $this->vialName($fields, $peptide['name'], null);
-        $profileIds = $this->profileIdsForWrite($pdo, $fields, true);
-        if ($profileIds === null) {
-            $profileIds = [(string) $this->profiles->defaultProfile($pdo)['id']];
-        }
-        $id = $this->ids->uuid();
-        $now = $this->timestamp();
-        $bottleId = $this->bacBottles->debitCurrent($pdo, $bacWaterMl);
-
-        $stmt = $pdo->prepare(
-            'INSERT INTO compounds (
-                id, peptide_type_id, peptide_type_slug, peptide_type_name,
-                peptide_mg, bac_water_ml, compounded_at, notes, created_at, bac_bottle_id,
-                name, is_open
-             ) VALUES (
-                :id, :peptide_type_id, :peptide_type_slug, :peptide_type_name,
-                :peptide_mg, :bac_water_ml, :compounded_at, :notes, :created_at, :bac_bottle_id,
-                :name, :is_open
-             )'
-        );
-        $stmt->execute([
-            ':id' => $id,
-            ':peptide_type_id' => $peptide['id'],
-            ':peptide_type_slug' => $peptide['slug'],
-            ':peptide_type_name' => $peptide['name'],
-            ':peptide_mg' => $peptideMg,
-            ':bac_water_ml' => $bacWaterMl,
-            ':compounded_at' => $compoundedAt,
-            ':notes' => $notes,
-            ':created_at' => $now,
-            ':bac_bottle_id' => $bottleId,
-            ':name' => $name,
-            ':is_open' => 1,
-        ]);
-
-        $this->profiles->replaceCompoundProfiles($pdo, $id, $profileIds);
-
-        return $this->get($pdo, $id);
+        return $this->mix->create($pdo, $fields);
     }
 
     /**
-     * Mix fields stay editable after uses. Changing mg or BAC recalculates stored use mg.
-     *
      * @return array<string, mixed>
      */
     public function patch(PDO $pdo, string $id, FieldParser $fields): array
     {
-        $existing = $this->get($pdo, $id);
-
-        $peptideTypeId = $fields->has('peptide_type_id')
-            ? $fields->requireString('peptide_type_id')
-            : (string) $existing['peptide_type_id'];
-        $peptideMg = $fields->has('peptide_mg')
-            ? $this->doses->roundMg($fields->requirePositiveFloat('peptide_mg'))
-            : $this->doses->roundMg((float) $existing['peptide_mg']);
-        $bacWaterMl = $fields->has('bac_water_ml')
-            ? $fields->requirePositiveFloat('bac_water_ml')
-            : (float) $existing['bac_water_ml'];
-        $compoundedAt = $fields->has('compounded_at')
-            ? $fields->requireDatetime('compounded_at')
-            : (string) $existing['compounded_at'];
-        $notes = $fields->has('notes') ? $fields->optionalString('notes') : $existing['notes'];
-        $name = $this->vialName($fields, (string) $existing['peptide_type_name'], (string) $existing['name']);
-
-        $mixChanged = $this->doses->roundMg((float) $existing['peptide_mg']) !== $peptideMg
-            || abs((float) $existing['bac_water_ml'] - $bacWaterMl) > 1e-9;
-        if ($mixChanged) {
-            $this->assertMixFitsUses($pdo, $id, $peptideMg, $bacWaterMl);
-        }
-
-        $bottleId = $existing['bac_bottle_id'] === null ? null : (string) $existing['bac_bottle_id'];
-        if (abs((float) $existing['bac_water_ml'] - $bacWaterMl) > 1e-9) {
-            $bottleId = $this->bacBottles->applyMixDelta(
-                $pdo,
-                $bottleId,
-                (float) $existing['bac_water_ml'],
-                $bacWaterMl,
-            );
-        }
-
-        $peptide = $this->peptides->require($pdo, $peptideTypeId);
-        $profileIds = $this->profileIdsForWrite($pdo, $fields, false);
-
-        $stmt = $pdo->prepare(
-            'UPDATE compounds SET
-                peptide_type_id = :peptide_type_id,
-                peptide_type_slug = :peptide_type_slug,
-                peptide_type_name = :peptide_type_name,
-                peptide_mg = :peptide_mg,
-                bac_water_ml = :bac_water_ml,
-                compounded_at = :compounded_at,
-                notes = :notes,
-                bac_bottle_id = :bac_bottle_id,
-                name = :name
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            ':id' => $id,
-            ':peptide_type_id' => $peptide['id'],
-            ':peptide_type_slug' => $peptide['slug'],
-            ':peptide_type_name' => $peptide['name'],
-            ':peptide_mg' => $peptideMg,
-            ':bac_water_ml' => $bacWaterMl,
-            ':compounded_at' => $compoundedAt,
-            ':notes' => $notes,
-            ':bac_bottle_id' => $bottleId,
-            ':name' => $name,
-        ]);
-
-        if ($mixChanged) {
-            $this->syncUseDoses($pdo, $id, $peptideMg, $bacWaterMl);
-        }
-
-        if ($profileIds !== null) {
-            $this->profiles->replaceCompoundProfiles($pdo, $id, $profileIds);
-        }
-
-        return $this->get($pdo, $id);
+        return $this->mix->patch($pdo, $id, $fields);
     }
 
     /**
-     * Sets remaining volume to a measured amount. Delta is stored as milligrams
-     * so later uses still compute remainder from the ledger.
-     *
      * @return array<string, mixed>
      */
     public function adjust(PDO $pdo, string $id, FieldParser $fields): array
     {
-        $existing = $this->get($pdo, $id);
-        if ($existing['archived_at'] !== null) {
-            throw new ValidationException(['id' => [DoseConfig::COMPOUND_ARCHIVED]], DoseConfig::COMPOUND_ARCHIVED);
-        }
-
-        $targetMl = $this->doses->roundVolume($fields->requireNonNegativeFloat('remaining_ml'));
-        $mixMl = (float) $existing['bac_water_ml'];
-        if ($targetMl - $mixMl > 1e-9) {
-            throw new ValidationException(
-                ['remaining_ml' => [DoseConfig::REMAINING_EXCEEDS_MIX]],
-                DoseConfig::REMAINING_EXCEEDS_MIX,
-            );
-        }
-
-        $concentration = (float) $existing['concentration'];
-        $targetMg = $this->doses->roundMg($targetMl * $concentration);
-        $deltaMg = $this->doses->roundMg($targetMg - (float) $existing['remaining_mg']);
-        if (abs($deltaMg) < 1e-9) {
-            return $existing;
-        }
-
-        $stmt = $pdo->prepare(
-            'INSERT INTO compound_adjustments (id, compound_id, delta_mg, remaining_ml, notes, created_at)
-             VALUES (:id, :compound_id, :delta_mg, :remaining_ml, :notes, :created_at)'
-        );
-        $stmt->execute([
-            ':id' => $this->ids->uuid(),
-            ':compound_id' => $id,
-            ':delta_mg' => $deltaMg,
-            ':remaining_ml' => $targetMl,
-            ':notes' => $fields->optionalString('notes'),
-            ':created_at' => $this->timestamp(),
-        ]);
-
-        return $this->get($pdo, $id);
+        return $this->adjustments->adjust($pdo, $id, $fields);
     }
 
     /**
-     * Hides an empty vial from inventory lists. Finding archived vials is later work.
-     *
      * @return array<string, mixed>
      */
     public function archive(PDO $pdo, string $id): array
     {
-        $existing = $this->get($pdo, $id);
+        $existing = $this->queries->get($pdo, $id);
         $this->archivePolicy->apply(new CompoundStock($pdo, $existing), $this->clock);
 
-        return $this->get($pdo, $id);
+        return $this->queries->get($pdo, $id);
     }
 
     public function delete(PDO $pdo, string $id): void
     {
-        $row = $this->findRow($pdo, $id);
-        if ($row === null) {
-            throw new DomainRecordNotFoundException(DoseConfig::COMPOUND_UNKNOWN);
-        }
-        if ($this->hasUses($pdo, $id)) {
-            throw new ValidationException(['id' => [DoseConfig::COMPOUND_HAS_USES]], DoseConfig::COMPOUND_HAS_USES);
-        }
-
-        $bottleId = $row['bac_bottle_id'] === null ? null : (string) $row['bac_bottle_id'];
-        $this->bacBottles->credit($pdo, $bottleId, (float) $row['bac_water_ml']);
-
-        $unlink = $pdo->prepare('DELETE FROM compound_profiles WHERE compound_id = :id');
-        $unlink->execute([':id' => $id]);
-        $stmt = $pdo->prepare('DELETE FROM compounds WHERE id = :id');
-        $stmt->execute([':id' => $id]);
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function currentRow(PDO $pdo): ?array
-    {
-        $stmt = $pdo->query(
-            'SELECT * FROM compounds WHERE archived_at IS NULL ORDER BY compounded_at DESC, id DESC LIMIT 1'
-        );
-        $row = $stmt === false ? false : $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return is_array($row) ? $row : null;
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function findRow(PDO $pdo, string $id): ?array
-    {
-        $stmt = $pdo->prepare('SELECT * FROM compounds WHERE id = :id');
-        $stmt->execute([':id' => $id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return is_array($row) ? $row : null;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     * @param array<string, mixed> $syringe
-     * @return array<string, mixed>
-     */
-    private function present(PDO $pdo, array $row, array $syringe): array
-    {
-        $id = (string) $row['id'];
-        $peptideMg = (float) $row['peptide_mg'];
-        $bacWaterMl = (float) $row['bac_water_ml'];
-        $adjustmentMg = $this->adjustmentPeptideMg($pdo, $id);
-        $remainder = $this->doses->remaining(
-            $peptideMg,
-            $this->usedPeptideMg($pdo, $id),
-            $bacWaterMl,
-            (float) $syringe['volume_ml'],
-            (float) $syringe['capacity_iu'],
-            $adjustmentMg,
-        );
-        $archivedAt = !isset($row['archived_at']) || $row['archived_at'] === null || $row['archived_at'] === ''
-            ? null
-            : (string) $row['archived_at'];
-
-        return [
-            'id' => $id,
-            'name' => (string) $row['name'],
-            'is_open' => $archivedAt === null,
-            'archived_at' => $archivedAt,
-            'peptide_type_id' => (string) $row['peptide_type_id'],
-            'peptide_type_slug' => (string) $row['peptide_type_slug'],
-            'peptide_type_name' => (string) $row['peptide_type_name'],
-            'peptide_mg' => $peptideMg,
-            'bac_water_ml' => $bacWaterMl,
-            'compounded_at' => (string) $row['compounded_at'],
-            'notes' => $row['notes'] === null ? null : (string) $row['notes'],
-            'created_at' => (string) $row['created_at'],
-            'bac_bottle_id' => $row['bac_bottle_id'] === null ? null : (string) $row['bac_bottle_id'],
-            'has_uses' => $this->hasUses($pdo, $id),
-            'adjustment_mg' => $adjustmentMg,
-            'remaining_mg' => $remainder->remainingMg,
-            'remaining_ml' => $remainder->remainingMl,
-            'remaining_iu' => $remainder->remainingIu,
-            'concentration' => $remainder->concentration,
-            'profile_ids' => $this->profiles->profileIdsForCompound($pdo, $id),
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $presented
-     * @return array<string, mixed>
-     */
-    private function remainderSummary(array $presented): array
-    {
-        return [
-            'compound_id' => $presented['id'],
-            'name' => $presented['name'],
-            'peptide_name' => $presented['peptide_type_name'],
-            'remaining_mg' => $presented['remaining_mg'],
-            'remaining_ml' => $presented['remaining_ml'],
-            'remaining_iu' => $presented['remaining_iu'],
-            'concentration' => $presented['concentration'],
-            'compounded_at' => $presented['compounded_at'],
-            'is_open' => $presented['is_open'],
-        ];
-    }
-
-    /**
-     * @return list<string>|null
-     */
-    private function profileIdsForWrite(PDO $pdo, FieldParser $fields, bool $create): ?array
-    {
-        $ids = $fields->optionalIdList('profile_ids');
-        if ($ids === null) {
-            if (!$create) {
-                return null;
-            }
-
-            return [(string) $this->profiles->defaultProfile($pdo)['id']];
-        }
-
-        return $this->profiles->requireIds($pdo, $ids);
-    }
-
-    private function vialName(FieldParser $fields, string $peptideName, ?string $existing): string
-    {
-        if (!$fields->has('name')) {
-            return $existing ?? $peptideName;
-        }
-
-        $name = $fields->optionalString('name');
-        if ($name === null) {
-            throw new ValidationException(['name' => [DoseConfig::MUST_BE_TEXT]]);
-        }
-        if (strlen($name) > DoseConfig::VIAL_NAME_MAX) {
-            throw new ValidationException(['name' => [DoseConfig::VIAL_NAME_TOO_LONG]]);
-        }
-
-        return $name;
-    }
-
-    private function assertMixFitsUses(PDO $pdo, string $compoundId, float $peptideMg, float $bacWaterMl): void
-    {
-        $used = $this->doses->roundMg($this->recalculatedUsedMg($pdo, $compoundId, $peptideMg, $bacWaterMl));
-        $netUsed = $this->doses->roundMg($used - $this->adjustmentPeptideMg($pdo, $compoundId));
-        if (!$this->doses->exceedsRemainder($netUsed, $peptideMg)) {
-            return;
-        }
-
-        throw new ValidationException(
-            ['peptide_mg' => [DoseConfig::COMPOUND_OVERDRAW]],
-            DoseConfig::COMPOUND_OVERDRAW,
-        );
-    }
-
-    private function syncUseDoses(PDO $pdo, string $compoundId, float $peptideMg, float $bacWaterMl): void
-    {
-        $now = $this->timestamp();
-        $update = $pdo->prepare(
-            'UPDATE uses SET volume_ml = :volume_ml, peptide_mg = :peptide_mg, updated_at = :updated_at WHERE id = :id'
-        );
-        foreach ($this->useDoseRows($pdo, $compoundId) as $row) {
-            $iu = (float) $row['iu'];
-            $volumeMl = (float) $row['syringe_volume_ml'];
-            $capacityIu = (float) $row['syringe_capacity_iu'];
-            $update->execute([
-                ':id' => $row['id'],
-                ':volume_ml' => $this->doses->volumeMl($iu, $volumeMl, $capacityIu),
-                ':peptide_mg' => $this->doses->peptideMg($iu, $peptideMg, $bacWaterMl, $volumeMl, $capacityIu),
-                ':updated_at' => $now,
-            ]);
-        }
-    }
-
-    private function recalculatedUsedMg(
-        PDO $pdo,
-        string $compoundId,
-        float $peptideMg,
-        float $bacWaterMl,
-    ): float {
-        $used = 0.0;
-        foreach ($this->useDoseRows($pdo, $compoundId) as $row) {
-            $used += $this->doses->peptideMg(
-                (float) $row['iu'],
-                $peptideMg,
-                $bacWaterMl,
-                (float) $row['syringe_volume_ml'],
-                (float) $row['syringe_capacity_iu'],
-            );
-        }
-
-        return $used;
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function useDoseRows(PDO $pdo, string $compoundId): array
-    {
-        $stmt = $pdo->prepare(
-            'SELECT id, iu, syringe_volume_ml, syringe_capacity_iu FROM uses WHERE compound_id = :id'
-        );
-        $stmt->execute([':id' => $compoundId]);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        return is_array($rows) ? $rows : [];
-    }
-
-    private function timestamp(): string
-    {
-        return $this->clock->now()->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z');
+        $this->mix->delete($pdo, $id);
     }
 }

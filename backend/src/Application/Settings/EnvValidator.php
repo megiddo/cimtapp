@@ -57,7 +57,7 @@ final class EnvValidator
         $sessionSecure = $this->isTruthy($this->read($env, 'SESSION_SECURE', 'false'));
 
         if ($this->requiresGoogleOAuth($appEnv)) {
-            $this->assertGoogleConfigured($env);
+            (new GoogleEnvGuard($this))->assertConfigured($env);
         }
 
         $googleClientId = $this->read($env, 'GOOGLE_CLIENT_ID');
@@ -137,17 +137,7 @@ final class EnvValidator
      */
     public function mergeProcessEnv(array $server, array $env, array $fromGetenv): array
     {
-        $merged = $server;
-        foreach ([$env, $fromGetenv] as $source) {
-            foreach ($source as $key => $value) {
-                if ($value === '' || $value === false || $value === null) {
-                    continue;
-                }
-                $merged[$key] = $value;
-            }
-        }
-
-        return $merged;
+        return (new EnvMerger())->merge($server, $env, $fromGetenv);
     }
 
     /**
@@ -155,22 +145,13 @@ final class EnvValidator
      */
     public function assertGoogleConfigured(array $env): void
     {
-        foreach (['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'] as $name) {
-            if ($this->read($env, $name) === '') {
-                throw new InvalidArgumentException($name . ' is required in production.');
-            }
-        }
-
-        $redirect = $this->read($env, 'GOOGLE_REDIRECT_URI');
-        if (!$this->isValidAppUrl($redirect)) {
-            throw new InvalidArgumentException('GOOGLE_REDIRECT_URI must be an absolute http(s) URL.');
-        }
+        (new GoogleEnvGuard($this))->assertConfigured($env);
     }
 
     /**
      * @param array<string, mixed> $env
      */
-    private function read(array $env, string $key, string $default = ''): string
+    public function read(array $env, string $key, string $default = ''): string
     {
         if (!array_key_exists($key, $env)) {
             return $default;

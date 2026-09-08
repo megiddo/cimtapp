@@ -8,9 +8,9 @@ use App\Application\Actions\Action;
 use App\Domain\Auth\AuthRateLimiter;
 use App\Domain\Auth\AuthService;
 use App\Domain\Auth\CredentialParser;
-use App\Domain\Auth\SessionService;
+use App\Domain\Auth\SessionIssuer;
+use App\Domain\Auth\UserMeMapper;
 use App\Infrastructure\Http\ClientIp;
-use App\Infrastructure\Http\SessionCookie;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Log\LoggerInterface;
 
@@ -19,8 +19,7 @@ final class LoginAction extends Action
     public function __construct(
         LoggerInterface $logger,
         private readonly AuthService $auth,
-        private readonly SessionService $sessions,
-        private readonly SessionCookie $cookie,
+        private readonly SessionIssuer $sessions,
         private readonly CredentialParser $parser,
         private readonly AuthRateLimiter $limiter,
     ) {
@@ -32,9 +31,8 @@ final class LoginAction extends Action
         $credentials = $this->parser->parse($this->getFormData());
         $this->limiter->guardLogin(ClientIp::from($this->request), $credentials['email']);
         $user = $this->auth->login($credentials['email'], $credentials['password']);
-        $session = $this->sessions->create($user->id);
-        $response = $this->respondWithData($user->toMeArray());
+        $response = $this->respondWithData(UserMeMapper::fromUser($user));
 
-        return $this->cookie->apply($response, $session->id, $this->sessions->ttlSeconds());
+        return $this->sessions->issue($response, $user->id);
     }
 }

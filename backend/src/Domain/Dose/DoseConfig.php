@@ -6,144 +6,137 @@ namespace App\Domain\Dose;
 
 final class DoseConfig
 {
-    public const MG_DECIMALS = 4;
+    public const MG_DECIMALS = DoseLimits::MG_DECIMALS;
 
-    public const VOLUME_DECIMALS = 6;
+    public const VOLUME_DECIMALS = DoseLimits::VOLUME_DECIMALS;
 
-    public const IU_DECIMALS = 1;
+    public const IU_DECIMALS = DoseLimits::IU_DECIMALS;
 
-    public const CONCENTRATION_WARN_LOW = 0.5;
+    public const CONCENTRATION_WARN_LOW = DoseLimits::CONCENTRATION_WARN_LOW;
 
-    public const CONCENTRATION_WARN_HIGH = 20.0;
+    public const CONCENTRATION_WARN_HIGH = DoseLimits::CONCENTRATION_WARN_HIGH;
 
-    public const USES_DEFAULT_LIMIT = 50;
+    public const USES_DEFAULT_LIMIT = DoseLimits::USES_DEFAULT_LIMIT;
 
-    public const USES_MAX_LIMIT = 100;
+    public const USES_MAX_LIMIT = DoseLimits::USES_MAX_LIMIT;
 
-    public const FALLBACK_SYRINGE_VOLUME_ML = 0.5;
+    public const FALLBACK_SYRINGE_VOLUME_ML = DoseLimits::FALLBACK_SYRINGE_VOLUME_ML;
 
-    public const FALLBACK_SYRINGE_CAPACITY_IU = 50.0;
+    public const FALLBACK_SYRINGE_CAPACITY_IU = DoseLimits::FALLBACK_SYRINGE_CAPACITY_IU;
 
-    public const IU_NOT_POSITIVE = 'IU must be greater than 0.';
+    public const IU_NOT_POSITIVE = DoseMessages::IU_NOT_POSITIVE;
 
-    public const IU_ONE_DECIMAL = 'IU allows one decimal place.';
+    public const IU_ONE_DECIMAL = DoseMessages::IU_ONE_DECIMAL;
 
-    public const MUST_BE_POSITIVE = 'Must be greater than 0.';
+    public const MUST_BE_POSITIVE = DoseMessages::MUST_BE_POSITIVE;
 
-    public const MUST_BE_NON_NEGATIVE = 'Must be 0 or greater.';
+    public const MUST_BE_NON_NEGATIVE = DoseMessages::MUST_BE_NON_NEGATIVE;
 
-    public const MUST_BE_NUMBER = 'Enter a number greater than 0.';
+    public const MUST_BE_NUMBER = DoseMessages::MUST_BE_NUMBER;
 
-    public const MUST_BE_TEXT = 'Must be text.';
+    public const MUST_BE_TEXT = DoseMessages::MUST_BE_TEXT;
 
-    public const MUST_BE_BOOLEAN = 'Must be true or false.';
+    public const MUST_BE_BOOLEAN = DoseMessages::MUST_BE_BOOLEAN;
 
-    public const MUST_BE_DATETIME = 'Enter a valid date and time.';
+    public const MUST_BE_DATETIME = DoseMessages::MUST_BE_DATETIME;
 
-    public const PEPTIDE_UNKNOWN = 'Choose a peptide from the catalog.';
+    public const PEPTIDE_UNKNOWN = DoseMessages::PEPTIDE_UNKNOWN;
 
-    public const PEPTIDE_NAME_TAKEN = 'That peptide is already on the list.';
+    public const PEPTIDE_NAME_TAKEN = DoseMessages::PEPTIDE_NAME_TAKEN;
 
-    public const PEPTIDE_NAME_TOO_LONG = 'Use a name of 80 characters or fewer.';
+    public const PEPTIDE_NAME_TOO_LONG = DoseMessages::PEPTIDE_NAME_TOO_LONG;
 
-    public const VIAL_NAME_MAX = 80;
+    public const VIAL_NAME_MAX = DoseLimits::VIAL_NAME_MAX;
 
-    public const VIAL_NAME_TOO_LONG = 'Use a name of 80 characters or fewer.';
+    public const VIAL_NAME_TOO_LONG = DoseMessages::VIAL_NAME_TOO_LONG;
 
-    public const NO_COMPOUND = 'Mix a vial before logging a use.';
+    public const NO_COMPOUND = DoseMessages::NO_COMPOUND;
 
-    public const COMPOUND_UNKNOWN = 'Compound not found.';
+    public const COMPOUND_UNKNOWN = DoseMessages::COMPOUND_UNKNOWN;
 
-    public const SYRINGE_UNKNOWN = 'Syringe not found.';
+    public const SYRINGE_UNKNOWN = DoseMessages::SYRINGE_UNKNOWN;
 
-    public const SYRINGE_STOCK_EMPTY = 'No syringes remaining of this type.';
+    public const SYRINGE_STOCK_EMPTY = DoseMessages::SYRINGE_STOCK_EMPTY;
 
-    public const BAC_UNKNOWN = 'Bacteriostatic water bottle not found.';
+    public const BAC_UNKNOWN = DoseMessages::BAC_UNKNOWN;
 
-    public const NO_BAC_BOTTLE = 'Add a bacteriostatic water bottle before mixing a vial.';
+    public const NO_BAC_BOTTLE = DoseMessages::NO_BAC_BOTTLE;
 
-    public const BAC_IN_USE = 'This bottle has been used and cannot be deleted.';
+    public const BAC_IN_USE = DoseMessages::BAC_IN_USE;
 
-    public const MUST_BE_WHOLE = 'Enter a whole number greater than 0.';
+    public const MUST_BE_WHOLE = DoseMessages::MUST_BE_WHOLE;
 
-    public const USE_UNKNOWN = 'Use not found.';
+    public const USE_UNKNOWN = DoseMessages::USE_UNKNOWN;
 
-    public const DEFAULT_REQUIRED = 'Keep one default syringe.';
+    public const DEFAULT_REQUIRED = DoseMessages::DEFAULT_REQUIRED;
 
-    public const SYRINGE_LAST = 'Keep at least one syringe type.';
+    public const SYRINGE_LAST = DoseMessages::SYRINGE_LAST;
 
-    public const COMPOUND_HAS_USES = 'This vial has logged uses and cannot be deleted.';
+    public const COMPOUND_HAS_USES = DoseMessages::COMPOUND_HAS_USES;
 
-    public const COMPOUND_OVERDRAW = 'Existing uses would exceed this mix. Reduce those uses or increase peptide milligrams.';
+    public const COMPOUND_OVERDRAW = DoseMessages::COMPOUND_OVERDRAW;
 
-    public const COMPOUND_ARCHIVED = 'This vial is archived.';
+    public const COMPOUND_ARCHIVED = DoseMessages::COMPOUND_ARCHIVED;
 
-    public const ALREADY_ARCHIVED = 'Already archived.';
+    public const ALREADY_ARCHIVED = DoseMessages::ALREADY_ARCHIVED;
 
-    public const ARCHIVE_NOT_EMPTY = 'Archive is available when remaining is 0.';
+    public const ARCHIVE_NOT_EMPTY = DoseMessages::ARCHIVE_NOT_EMPTY;
 
-    public const REMAINING_EXCEEDS_MIX = 'Remaining cannot exceed the mix volume.';
+    public const REMAINING_EXCEEDS_MIX = DoseMessages::REMAINING_EXCEEDS_MIX;
 
-    public const LIMIT_INVALID = 'Limit must be between 1 and 100.';
+    public const LIMIT_INVALID = DoseMessages::LIMIT_INVALID;
 
-    public const BEFORE_INVALID = 'before must be an ISO timestamp.';
+    public const BEFORE_INVALID = DoseMessages::BEFORE_INVALID;
 
-    public const PROFILE_DEFAULT_NAME = 'Default';
+    public const PROFILE_DEFAULT_NAME = DoseMessages::PROFILE_DEFAULT_NAME;
 
-    public const PROFILE_MAX = 5;
+    public const PROFILE_MAX = DoseLimits::PROFILE_MAX;
 
-    public const PROFILE_NAME_MAX = 40;
+    public const PROFILE_NAME_MAX = DoseLimits::PROFILE_NAME_MAX;
 
-    public const PROFILE_UNKNOWN = 'Profile not found.';
+    public const PROFILE_UNKNOWN = DoseMessages::PROFILE_UNKNOWN;
 
-    public const PROFILE_NAME_TOO_LONG = 'Use a name of 40 characters or fewer.';
+    public const PROFILE_NAME_TOO_LONG = DoseMessages::PROFILE_NAME_TOO_LONG;
 
-    public const PROFILE_LIMIT = 'You can add up to 4 additional profiles.';
+    public const PROFILE_LIMIT = DoseMessages::PROFILE_LIMIT;
 
-    public const PROFILE_DEFAULT_REQUIRED = 'Keep the default profile.';
+    public const PROFILE_DEFAULT_REQUIRED = DoseMessages::PROFILE_DEFAULT_REQUIRED;
 
-    public const PROFILE_HAS_USES = 'Move this profile’s uses before deleting it.';
+    public const PROFILE_HAS_USES = DoseMessages::PROFILE_HAS_USES;
 
-    public const PROFILE_VIAL_MISMATCH = 'This vial is not associated with that profile.';
+    public const PROFILE_VIAL_MISMATCH = DoseMessages::PROFILE_VIAL_MISMATCH;
 
-    public const MUST_BE_ID_LIST = 'Choose one or more profiles.';
+    public const MUST_BE_ID_LIST = DoseMessages::MUST_BE_ID_LIST;
 
-    public const PROFILE_REQUIRED = 'Choose at least one profile.';
+    public const PROFILE_REQUIRED = DoseMessages::PROFILE_REQUIRED;
 
     public static function overdraw(string $requestedIu, string $remainingIu): string
     {
-        return $requestedIu . ' IU exceeds ' . $remainingIu . ' IU remaining in this vial.';
+        return DoseFormatter::overdraw($requestedIu, $remainingIu);
     }
 
     public static function bacOverdraw(string $requestedMl, string $remainingMl): string
     {
-        return $requestedMl . ' mL exceeds ' . $remainingMl . ' mL remaining in bacteriostatic water.';
+        return DoseFormatter::bacOverdraw($requestedMl, $remainingMl);
     }
 
     public static function syringeOverdraw(int $requested, int $remaining): string
     {
-        return $requested . ' exceeds ' . $remaining . ' syringes remaining.';
+        return DoseFormatter::syringeOverdraw($requested, $remaining);
     }
 
     public static function formatIu(float $iu): string
     {
-        $rounded = round($iu, self::IU_DECIMALS);
-        if (abs($rounded - round($rounded)) < 1e-9) {
-            return (string) (int) round($rounded);
-        }
-
-        return number_format($rounded, self::IU_DECIMALS, '.', '');
+        return DoseFormatter::formatIu($iu);
     }
 
     public static function syringeLabel(float $volumeMl, float $capacityIu): string
     {
-        return self::trimNumber($volumeMl) . ' mL / ' . self::trimNumber($capacityIu) . ' IU';
+        return DoseFormatter::syringeLabel($volumeMl, $capacityIu);
     }
 
     public static function trimNumber(float $value): string
     {
-        $formatted = number_format($value, 4, '.', '');
-
-        return rtrim(rtrim($formatted, '0'), '.');
+        return DoseFormatter::trimNumber($value);
     }
 }

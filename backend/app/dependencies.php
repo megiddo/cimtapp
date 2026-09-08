@@ -13,6 +13,7 @@ use App\Domain\Auth\GoogleOAuthClient;
 use App\Domain\Auth\IdGenerator;
 use App\Domain\Auth\OauthStateService;
 use App\Domain\Auth\PasswordHasher;
+use App\Domain\Auth\SessionIssuer;
 use App\Domain\Auth\SessionService;
 use App\Domain\Auth\SystemClock;
 use App\Domain\Auth\UserProvisioner;
@@ -187,6 +188,12 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(UserStorePort::class),
             );
         },
+        SessionIssuer::class => static function (ContainerInterface $c): SessionIssuer {
+            return new SessionIssuer(
+                $c->get(SessionService::class),
+                $c->get(SessionCookie::class),
+            );
+        },
         SessionService::class => static function (ContainerInterface $c): SessionService {
             return new SessionService(
                 $c->get(\App\Domain\Auth\SessionRepository::class),
@@ -219,8 +226,7 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(GoogleOAuthClient::class),
                 $c->get(OauthStateService::class),
                 $c->get(AuthService::class),
-                $c->get(SessionService::class),
-                $c->get(SessionCookie::class),
+                $c->get(\App\Domain\Auth\SessionIssuer::class),
                 (string) $settings->get('appUrl'),
             );
         },

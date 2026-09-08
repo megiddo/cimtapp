@@ -70,7 +70,8 @@ v1 is complete. Out of scope remains: new peptide types, household sharing, zero
 Plan: [v0.3.md](v0.3.md) — frontend and backend pattern splits, inventory open/archived + full lists.
 
 - [x] Milestone 0 — testing floors live: PHPUnit/Vitest **90%** line coverage; Infection **80 / 80**; Stryker **break 80 / high 80** ([v0.3-testing.md](v0.3-testing.md))
-- [x] Milestone 1 — frontend design patterns on `0.3.3-frontend`: `readAction` / `DomainResult` / repositories, `InventorySection` + full-list routes, log wizard, settings composite, chrome titles for Vials / BAC / Syringes. Optional CSS `@layer` file split and leftover backend god-service splits stay later.
-- [x] Milestone 2 — backend design-pattern **API/schema** on `0.3.2-backend-inventory`: `UserStorePort` backup methods; `StockItem` / `ArchivePolicy` / `StockList` wrappers. Leftover splits (Compound Mix/Adjust/Query, Auth use cases, UserStore lock/cipher extract) stay later.
+- [x] Milestone 1 — frontend design patterns on `0.3.3-frontend`: `readAction` / `DomainResult` / repositories, `InventorySection` + full-list routes, log wizard, settings composite, chrome titles for Vials / BAC / Syringes.
+- [x] Milestone 2 — backend design-pattern **API/schema** on `0.3.2-backend-inventory`: `UserStorePort` backup methods; `StockItem` / `ArchivePolicy` / `StockList` wrappers.
 - [x] Milestone 3 — inventory **API/schema** on `0.3.2-backend-inventory`: v7 syringe `archived_at`, `view=all`, syringe archive, `is_open` close-state collapsed. Client fetchers + syringe Archive button landed; sheet/full-list pages stay milestone 1.
+- [x] Leftover splits **done** on `0.3.4-hygiene`: backend Compound/BAC/syringe/use/profile/auth/UserStore extracts; frontend CSS `@layer` + chrome file split.
 
