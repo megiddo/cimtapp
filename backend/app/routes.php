@@ -36,6 +36,7 @@ use App\Application\Actions\Profiles\CreateProfileAction;
 use App\Application\Actions\Profiles\DeleteProfileAction;
 use App\Application\Actions\Profiles\ListProfilesAction;
 use App\Application\Actions\Profiles\PatchProfileAction;
+use App\Application\Actions\Syringes\ArchiveSyringeAction;
 use App\Application\Actions\Syringes\BurnSyringeAction;
 use App\Application\Actions\Syringes\CreateSyringeAction;
 use App\Application\Actions\Syringes\DeleteSyringeAction;
@@ -80,6 +81,7 @@ return function (App $app): void {
             $authed->delete('/syringes/{id}', DeleteSyringeAction::class);
             $authed->post('/syringes/{id}/restock', RestockSyringeAction::class);
             $authed->post('/syringes/{id}/burn', BurnSyringeAction::class);
+            $authed->post('/syringes/{id}/archive', ArchiveSyringeAction::class);
             $authed->get('/bac-bottles', ListBacBottlesAction::class);
             $authed->post('/bac-bottles', CreateBacBottleAction::class);
             $authed->get('/bac-bottles/current', CurrentBacBottleAction::class);

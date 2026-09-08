@@ -6,28 +6,27 @@ namespace App\Domain\Dose;
 
 use App\Domain\Auth\IdGenerator;
 use App\Domain\Auth\ValidationException;
-use App\Domain\DomainException\DomainRecordNotFoundException;
 use PDO;
 
 final class SyringeService
 {
+    private readonly SyringeRepository $repository;
+    private readonly SyringeResolver $resolver;
+    private readonly SyringeStockService $stock;
+
     public function __construct(private readonly IdGenerator $ids)
     {
+        $this->repository = new SyringeRepository();
+        $this->resolver = new SyringeResolver($this->repository, new FallbackSyringe());
+        $this->stock = new SyringeStockService($this->repository, $this->resolver);
     }
 
     /**
      * @return list<array<string, mixed>>
      */
-    public function list(PDO $pdo): array
+    public function list(PDO $pdo, ?StockList $query = null): array
     {
-        $stmt = $pdo->query(
-            'SELECT id, label, volume_ml, capacity_iu, is_default, quantity
-             FROM syringe_profiles
-             ORDER BY is_default DESC, label ASC, id ASC'
-        );
-        $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        return array_values(array_map($this->map(...), is_array($rows) ? $rows : []));
+        return $this->repository->list($pdo, $query);
     }
 
     /**
@@ -35,12 +34,7 @@ final class SyringeService
      */
     public function get(PDO $pdo, string $id): array
     {
-        $row = $this->find($pdo, $id);
-        if ($row === null) {
-            throw new DomainRecordNotFoundException(DoseConfig::SYRINGE_UNKNOWN);
-        }
-
-        return $row;
+        return $this->resolver->get($pdo, $id);
     }
 
     /**
@@ -48,79 +42,23 @@ final class SyringeService
      */
     public function defaultSyringe(PDO $pdo): array
     {
-        $stmt = $pdo->query(
-            'SELECT id, label, volume_ml, capacity_iu, is_default, quantity
-             FROM syringe_profiles
-             WHERE is_default = 1
-             LIMIT 1'
-        );
-        $row = $stmt === false ? false : $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!is_array($row)) {
-            return $this->fallbackProfile();
-        }
-
-        return $this->map($row);
+        return $this->resolver->defaultSyringe($pdo);
     }
 
     /**
-     * Snapshot used for IU math when the user logs without a syringe type.
-     *
      * @return array<string, mixed>
      */
     public function fallbackProfile(): array
     {
-        return [
-            'id' => null,
-            'label' => DoseConfig::syringeLabel(
-                DoseConfig::FALLBACK_SYRINGE_VOLUME_ML,
-                DoseConfig::FALLBACK_SYRINGE_CAPACITY_IU,
-            ),
-            'volume_ml' => DoseConfig::FALLBACK_SYRINGE_VOLUME_ML,
-            'capacity_iu' => DoseConfig::FALLBACK_SYRINGE_CAPACITY_IU,
-            'is_default' => false,
-            'quantity' => 0,
-        ];
+        return $this->resolver->fallbackProfile();
     }
 
     /**
-     * Last-used syringe still in the profile table, else the default.
-     *
      * @return array<string, mixed>
      */
     public function syringeForNewUse(PDO $pdo, ?string $syringeId, ?string $profileId = null): array
     {
-        if ($syringeId !== null) {
-            return $this->get($pdo, $syringeId);
-        }
-
-        if ($profileId !== null) {
-            $stmt = $pdo->prepare(
-                'SELECT syringe_id
-                 FROM uses
-                 WHERE syringe_id IS NOT NULL AND profile_id = :profile_id
-                 ORDER BY used_at DESC, id DESC
-                 LIMIT 1'
-            );
-            $stmt->execute([':profile_id' => $profileId]);
-            $lastId = $stmt->fetchColumn();
-        } else {
-            $stmt = $pdo->query(
-                'SELECT syringe_id
-                 FROM uses
-                 WHERE syringe_id IS NOT NULL
-                 ORDER BY used_at DESC, id DESC
-                 LIMIT 1'
-            );
-            $lastId = $stmt === false ? false : $stmt->fetchColumn();
-        }
-        if (is_string($lastId) && $lastId !== '') {
-            $existing = $this->find($pdo, $lastId);
-            if ($existing !== null) {
-                return $existing;
-            }
-        }
-
-        return $this->defaultSyringe($pdo);
+        return $this->resolver->syringeForNewUse($pdo, $syringeId, $profileId);
     }
 
     /**
@@ -135,11 +73,7 @@ final class SyringeService
         $quantity = $fields->optionalPositiveInt('quantity') ?? 0;
         $id = $this->ids->uuid();
 
-        $stmt = $pdo->prepare(
-            'INSERT INTO syringe_profiles (id, label, volume_ml, capacity_iu, is_default, quantity)
-             VALUES (:id, :label, :volume_ml, :capacity_iu, :is_default, :quantity)'
-        );
-        $stmt->execute([
+        $this->repository->insert($pdo, [
             ':id' => $id,
             ':label' => $label,
             ':volume_ml' => $volumeMl,
@@ -149,7 +83,7 @@ final class SyringeService
         ]);
 
         if ($isDefault) {
-            $this->setDefault($pdo, $id);
+            $this->repository->setDefault($pdo, $id);
         }
 
         return $this->get($pdo, $id);
@@ -178,12 +112,7 @@ final class SyringeService
             $label = DoseConfig::syringeLabel($volumeMl, $capacityIu);
         }
 
-        $stmt = $pdo->prepare(
-            'UPDATE syringe_profiles
-             SET label = :label, volume_ml = :volume_ml, capacity_iu = :capacity_iu
-             WHERE id = :id'
-        );
-        $stmt->execute([
+        $this->repository->update($pdo, [
             ':id' => $id,
             ':label' => $label,
             ':volume_ml' => $volumeMl,
@@ -192,7 +121,7 @@ final class SyringeService
 
         $makeDefault = $fields->optionalBool('is_default');
         if ($makeDefault === true) {
-            $this->setDefault($pdo, $id);
+            $this->repository->setDefault($pdo, $id);
         } elseif ($makeDefault === false && (int) $existing['is_default'] === 1) {
             throw new ValidationException(['is_default' => [DoseConfig::DEFAULT_REQUIRED]]);
         }
@@ -204,15 +133,14 @@ final class SyringeService
     {
         $this->get($pdo, $id);
         $others = array_values(array_filter(
-            $this->list($pdo),
+            $this->list($pdo, StockList::allGrouped()),
             static fn (array $row): bool => (string) $row['id'] !== $id,
         ));
         if ($others === []) {
             throw new ValidationException(['id' => [DoseConfig::SYRINGE_LAST]], DoseConfig::SYRINGE_LAST);
         }
 
-        $stmt = $pdo->prepare('DELETE FROM syringe_profiles WHERE id = :id');
-        $stmt->execute([':id' => $id]);
+        $this->repository->delete($pdo, $id);
 
         $hasDefault = false;
         foreach ($others as $row) {
@@ -222,17 +150,16 @@ final class SyringeService
             }
         }
         if (!$hasDefault) {
-            $this->setDefault($pdo, (string) $others[0]['id']);
+            $this->repository->setDefault($pdo, (string) $others[0]['id']);
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function restock(PDO $pdo, string $id, FieldParser $fields): array
     {
-        $existing = $this->get($pdo, $id);
-        $count = $fields->requirePositiveInt('count');
-        $this->setQuantity($pdo, $id, (int) $existing['quantity'] + $count);
-
-        return $this->get($pdo, $id);
+        return $this->stock->restock($pdo, $id, $fields);
     }
 
     /**
@@ -240,85 +167,16 @@ final class SyringeService
      */
     public function burn(PDO $pdo, string $id, FieldParser $fields): array
     {
-        $existing = $this->get($pdo, $id);
-        $count = $fields->requirePositiveInt('count');
-        $remaining = (int) $existing['quantity'];
-        if ($count > $remaining) {
-            $message = DoseConfig::syringeOverdraw($count, $remaining);
-            throw new ValidationException(['count' => [$message]], $message);
-        }
-        $this->setQuantity($pdo, $id, $remaining - $count);
-
-        return $this->get($pdo, $id);
+        return $this->stock->burn($pdo, $id, $fields);
     }
 
     public function consumeOne(PDO $pdo, string $id): void
     {
-        $existing = $this->get($pdo, $id);
-        $remaining = (int) $existing['quantity'];
-        if ($remaining < 1) {
-            throw new ValidationException(
-                ['syringe_id' => [DoseConfig::SYRINGE_STOCK_EMPTY]],
-                DoseConfig::SYRINGE_STOCK_EMPTY,
-            );
-        }
-        $this->setQuantity($pdo, $id, $remaining - 1);
+        $this->stock->consumeOne($pdo, $id);
     }
 
     public function restoreOne(PDO $pdo, ?string $id): void
     {
-        if ($id === null || $id === '') {
-            return;
-        }
-        if ($this->find($pdo, $id) === null) {
-            return;
-        }
-        $existing = $this->get($pdo, $id);
-        $this->setQuantity($pdo, $id, (int) $existing['quantity'] + 1);
-    }
-
-    private function setQuantity(PDO $pdo, string $id, int $quantity): void
-    {
-        $stmt = $pdo->prepare('UPDATE syringe_profiles SET quantity = :quantity WHERE id = :id');
-        $stmt->execute([':id' => $id, ':quantity' => $quantity]);
-    }
-
-    private function setDefault(PDO $pdo, string $id): void
-    {
-        $pdo->exec('UPDATE syringe_profiles SET is_default = 0');
-        $stmt = $pdo->prepare('UPDATE syringe_profiles SET is_default = 1 WHERE id = :id');
-        $stmt->execute([':id' => $id]);
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function find(PDO $pdo, string $id): ?array
-    {
-        $stmt = $pdo->prepare(
-            'SELECT id, label, volume_ml, capacity_iu, is_default, quantity
-             FROM syringe_profiles
-             WHERE id = :id'
-        );
-        $stmt->execute([':id' => $id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return is_array($row) ? $this->map($row) : null;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     * @return array<string, mixed>
-     */
-    private function map(array $row): array
-    {
-        return [
-            'id' => (string) $row['id'],
-            'label' => (string) $row['label'],
-            'volume_ml' => (float) $row['volume_ml'],
-            'capacity_iu' => (float) $row['capacity_iu'],
-            'is_default' => (int) $row['is_default'] === 1,
-            'quantity' => (int) $row['quantity'],
-        ];
+        $this->stock->restoreOne($pdo, $id);
     }
 }

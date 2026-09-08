@@ -30,8 +30,8 @@ class UserSchemaMigratorTest extends TestCase
 
     public function testCurrentFormatIsProfiles(): void
     {
-        $this->assertSame(UserStoreFormat::V6Profiles, UserStoreFormat::current());
-        $this->assertSame(6, UserStoreFormat::current()->value);
+        $this->assertSame(UserStoreFormat::V7SyringeArchive, UserStoreFormat::current());
+        $this->assertSame(7, UserStoreFormat::current()->value);
     }
 
     public function testCatalogAppliesStrategiesInVersionOrder(): void
@@ -40,31 +40,34 @@ class UserSchemaMigratorTest extends TestCase
             static fn ($strategy): int => $strategy->version()->value,
             UserSchemaCatalog::default()->strategies(),
         );
-        $this->assertSame([1, 2, 3, 4, 5, 6], $versions);
+        $this->assertSame([1, 2, 3, 4, 5, 6, 7], $versions);
         $this->assertCount(1, UserSchemaCatalog::through(UserStoreFormat::V1Initial)->strategies());
         $this->assertCount(2, UserSchemaCatalog::through(UserStoreFormat::V2BacAndSyringeStock)->strategies());
         $this->assertCount(4, UserSchemaCatalog::through(UserStoreFormat::V4NamedOpenVials)->strategies());
         $this->assertCount(5, UserSchemaCatalog::through(UserStoreFormat::V5ArchiveAndAdjustments)->strategies());
         $this->assertCount(6, UserSchemaCatalog::through(UserStoreFormat::V6Profiles)->strategies());
+        $this->assertCount(7, UserSchemaCatalog::through(UserStoreFormat::V7SyringeArchive)->strategies());
         $this->assertDirectoryExists(UserSchemaCatalog::migrationsDirectory());
         $this->assertFileExists(UserSchemaCatalog::migrationsDirectory() . '/004_named_open_vials.sql');
         $this->assertFileExists(UserSchemaCatalog::migrationsDirectory() . '/005_archive_and_adjustments.sql');
         $this->assertFileExists(UserSchemaCatalog::migrationsDirectory() . '/006_profiles.sql');
+        $this->assertFileExists(UserSchemaCatalog::migrationsDirectory() . '/007_syringe_archive.sql');
     }
 
     public function testFreshSqliteReachesCurrentFormat(): void
     {
         $path = $this->dir . '/fresh.sqlite';
         $applied = (new UserMigrator())->migrate($path);
-        $this->assertSame(6, $applied);
+        $this->assertSame(7, $applied);
         $this->assertSame(0, (new UserMigrator())->migrate($path));
 
         $pdo = $this->pdo($path);
-        $this->assertSame(6, (new UserSchemaVersionDetector())->detect($pdo));
+        $this->assertSame(7, (new UserSchemaVersionDetector())->detect($pdo));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'name'));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'is_open'));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'archived_at'));
         $this->assertTrue($this->hasColumn($pdo, 'bac_bottles', 'archived_at'));
+        $this->assertTrue($this->hasColumn($pdo, 'syringe_profiles', 'archived_at'));
         $this->assertTrue($this->hasColumn($pdo, 'uses', 'profile_id'));
         $this->assertTrue($this->tableExists($pdo, 'compound_adjustments'));
         $this->assertTrue($this->tableExists($pdo, 'user_peptide_types'));
@@ -91,9 +94,9 @@ class UserSchemaMigratorTest extends TestCase
         $pdo = null;
 
         $applied = (new UserMigrator())->migrate($path);
-        $this->assertSame(5, $applied);
+        $this->assertSame(6, $applied);
         $pdo = $this->pdo($path);
-        $this->assertSame(6, (new UserSchemaVersionDetector())->detect($pdo));
+        $this->assertSame(7, (new UserSchemaVersionDetector())->detect($pdo));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'name'));
         $this->assertTrue($this->hasColumn($pdo, 'compounds', 'archived_at'));
         $this->assertTrue($this->tableExists($pdo, 'profiles'));
@@ -133,6 +136,10 @@ class UserSchemaMigratorTest extends TestCase
         $v6 = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $v6->exec('CREATE TABLE profiles (id TEXT)');
         $this->assertSame(6, $detector->detect($v6));
+
+        $v7 = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $v7->exec('CREATE TABLE syringe_profiles (id TEXT, archived_at TEXT)');
+        $this->assertSame(7, $detector->detect($v7));
     }
 
     public function testStoredFormatVersionWinsOverShape(): void
@@ -151,6 +158,9 @@ class UserSchemaMigratorTest extends TestCase
 
         $detector->writeVersion($pdo, 6);
         $this->assertSame(6, $detector->detect($pdo));
+
+        $detector->writeVersion($pdo, 7);
+        $this->assertSame(7, $detector->detect($pdo));
     }
 
     public function testEmptyFormatTableFallsThroughToShape(): void
@@ -217,7 +227,7 @@ class UserSchemaMigratorTest extends TestCase
         $pdo = null;
 
         $applied = (new UserMigrator())->migrate($path);
-        $this->assertSame(1, $applied);
+        $this->assertSame(2, $applied);
         $pdo = $this->pdo($path);
         $profile = $pdo->query('SELECT id, name, is_default FROM profiles')->fetch(PDO::FETCH_ASSOC);
         $this->assertSame('Default', $profile['name']);
@@ -228,6 +238,64 @@ class UserSchemaMigratorTest extends TestCase
             "SELECT profile_id FROM compound_profiles WHERE compound_id = 'c1'"
         )->fetchColumn();
         $this->assertSame($profile['id'], $compoundProfile);
+    }
+
+    public function testSyringeArchiveMutationBackfillsClosedVials(): void
+    {
+        $path = $this->dir . '/syringe-archive.sqlite';
+        (new UserMigrator(UserSchemaCatalog::through(UserStoreFormat::V6Profiles)))->migrate($path);
+        $pdo = $this->pdo($path);
+        $pdo->exec(
+            "INSERT INTO syringe_profiles (id, label, volume_ml, capacity_iu, is_default, quantity)
+             VALUES ('s1', '0.5 mL / 50 IU', 0.5, 50, 1, 0)"
+        );
+        $pdo->exec(
+            "INSERT INTO compounds (
+                id, peptide_type_id, peptide_type_slug, peptide_type_name,
+                peptide_mg, bac_water_ml, compounded_at, notes, created_at, name, is_open, archived_at
+             ) VALUES
+             (
+                'empty-closed', 'tirzepatide', 'tirzepatide', 'Tirzepatide',
+                10, 2, '2026-08-20T12:00', NULL, '2026-08-20T12:00:00Z', 'Empty closed', 0, NULL
+             ),
+             (
+                'stock-closed', 'tirzepatide', 'tirzepatide', 'Tirzepatide',
+                10, 2, '2026-08-20T12:00', NULL, '2026-08-20T12:00:00Z', 'Stock closed', 0, NULL
+             ),
+             (
+                'already-archived', 'tirzepatide', 'tirzepatide', 'Tirzepatide',
+                10, 2, '2026-08-20T12:00', NULL, '2026-08-20T12:00:00Z', 'Already archived', 0, '2026-01-01T00:00:00Z'
+             )"
+        );
+        $pdo->exec(
+            "INSERT INTO compound_adjustments (id, compound_id, delta_mg, remaining_ml, notes, created_at)
+             VALUES ('adj1', 'empty-closed', -10, 0, NULL, '2026-08-20T12:00:00Z')"
+        );
+        $pdo = null;
+
+        (new UserMigrator())->migrate($path);
+        $pdo = $this->pdo($path);
+        $this->assertTrue($this->hasColumn($pdo, 'syringe_profiles', 'archived_at'));
+        $syringeArchived = $pdo->query("SELECT archived_at FROM syringe_profiles WHERE id = 's1'")->fetchColumn();
+        $this->assertNull($syringeArchived);
+
+        $empty = $pdo->query(
+            "SELECT is_open, archived_at FROM compounds WHERE id = 'empty-closed'"
+        )->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame(0, (int) $empty['is_open']);
+        $this->assertNotNull($empty['archived_at']);
+
+        $stock = $pdo->query(
+            "SELECT is_open, archived_at FROM compounds WHERE id = 'stock-closed'"
+        )->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame(1, (int) $stock['is_open']);
+        $this->assertNull($stock['archived_at']);
+
+        $archived = $pdo->query(
+            "SELECT is_open, archived_at FROM compounds WHERE id = 'already-archived'"
+        )->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame(0, (int) $archived['is_open']);
+        $this->assertSame('2026-01-01T00:00:00Z', $archived['archived_at']);
     }
 
     public function testMissingSqlFileThrows(): void

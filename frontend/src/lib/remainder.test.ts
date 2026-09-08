@@ -24,5 +24,6 @@ describe('remainder tone', () => {
     expect(isDepleted(0)).toBe(true);
     expect(isDepleted(-0.01)).toBe(true);
     expect(isDepleted(0.01)).toBe(false);
+    expect(isDepleted(1)).toBe(false);
   });
 });

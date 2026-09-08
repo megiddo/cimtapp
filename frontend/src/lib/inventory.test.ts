@@ -35,6 +35,7 @@ import {
   burnBacBottle,
   archiveBacBottle,
   archiveCompound,
+  archiveSyringe,
   adjustCompound,
   fetchProfiles,
   createProfile,
@@ -183,15 +184,18 @@ describe('inventory API client', () => {
 
   it('picks last-used syringe then default then first', () => {
     const syringes = [
-      { id: 'a', label: 'A', volume_ml: 0.5, capacity_iu: 50, is_default: false, quantity: 4 },
-      { id: 'b', label: 'B', volume_ml: 1, capacity_iu: 40, is_default: true, quantity: 8 }
+      { id: 'a', label: 'A', volume_ml: 0.5, capacity_iu: 50, is_default: false, quantity: 4, archived_at: null },
+      { id: 'b', label: 'B', volume_ml: 1, capacity_iu: 40, is_default: true, quantity: 8, archived_at: null }
     ];
     expect(defaultSyringeId(syringes, 'a')).toBe('a');
     expect(defaultSyringeId(syringes, 'missing')).toBe('b');
     expect(defaultSyringeId(syringes, null)).toBe('b');
     expect(defaultSyringeId([], null)).toBe('');
     expect(
-      defaultSyringeId([{ id: 'z', label: 'Z', volume_ml: 1, capacity_iu: 1, is_default: false, quantity: 0 }], null)
+      defaultSyringeId(
+        [{ id: 'z', label: 'Z', volume_ml: 1, capacity_iu: 1, is_default: false, quantity: 0, archived_at: null }],
+        null
+      )
     ).toBe('z');
   });
 
@@ -538,6 +542,14 @@ describe('inventory API client', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValueOnce(
+        jsonResponse(200, { statusCode: 200, data: { id: 's1', archived_at: '2026-08-27T16:00:00Z', quantity: 0 } })
+      )
+    );
+    await expect(archiveSyringe('s1')).resolves.toMatchObject({ ok: true, status: 200 });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
         jsonResponse(422, {
           statusCode: 422,
           error: {
@@ -549,6 +561,29 @@ describe('inventory API client', () => {
       )
     );
     await expect(archiveCompound('c1')).resolves.toMatchObject({ ok: false, status: 422 });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(422, {
+          statusCode: 422,
+          error: {
+            type: 'VALIDATION_ERROR',
+            description: 'Archive is available when remaining is 0.',
+            fields: { id: ['Archive is available when remaining is 0.'] }
+          }
+        })
+      )
+    );
+    const blockedSyringe = await archiveSyringe('s1');
+    expect(blockedSyringe).toMatchObject({
+      ok: false,
+      status: 422,
+      message: 'Archive is available when remaining is 0.'
+    });
+    if (!blockedSyringe.ok) {
+      expect(blockedSyringe.fields.id[0]).toBe('Archive is available when remaining is 0.');
+    }
   });
 
   it('lists and mutates profiles and filters uses by profile', async () => {
@@ -592,5 +627,384 @@ describe('inventory API client', () => {
       ] as Compound[],
       'p1'
     ).map((item) => item.id)).toEqual(['c1']);
+    expect(vialsForProfile([{ id: 'c3' } as Compound], 'p1')).toEqual([]);
+  });
+});
+
+const ORIGIN = 'http://app.test';
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+function stubPayload(status: number, body: unknown) {
+  const fetchMock = vi.fn().mockResolvedValue(jsonResponse(status, body));
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+function expectFetch(
+  fetchMock: ReturnType<typeof vi.fn>,
+  url: string,
+  init?: { method?: string; headers?: Record<string, string>; body?: unknown }
+) {
+  expect(fetchMock.mock.calls[0][0]).toBe(url);
+  const actual = (fetchMock.mock.calls[0][1] ?? {}) as RequestInit;
+  if (init?.method !== undefined) {
+    expect(actual.method).toBe(init.method);
+  }
+  if (init?.headers !== undefined) {
+    expect(actual.headers).toEqual(init.headers);
+  }
+  if (init?.body !== undefined) {
+    expect(JSON.parse(String(actual.body))).toEqual(init.body);
+  }
+}
+
+describe('inventory client contracts', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps remaining_iu only for finite numbers', () => {
+    expect(remainingIuFrom({ error: { remaining_iu: Number.POSITIVE_INFINITY } })).toBeNull();
+    expect(remainingIuFrom({ error: { remaining_iu: Number.NaN } })).toBeNull();
+    expect(remainingIuFrom({ error: { remaining_iu: 0 } })).toBe(0);
+  });
+
+  it('treats 404-with-body as missing and 200-with-data as present', async () => {
+    const ghost = { id: 'ghost', label: 'gone' };
+    stubPayload(404, { statusCode: 404, data: ghost, error: { type: 'RESOURCE_NOT_FOUND', description: 'missing' } });
+    await expect(fetchSyringe('ghost')).resolves.toBeNull();
+    stubPayload(404, { statusCode: 404, data: ghost, error: { type: 'RESOURCE_NOT_FOUND', description: 'missing' } });
+    await expect(fetchCompound('ghost')).resolves.toBeNull();
+    stubPayload(404, { statusCode: 404, data: ghost, error: { type: 'RESOURCE_NOT_FOUND', description: 'missing' } });
+    await expect(fetchBacBottle('ghost')).resolves.toBeNull();
+    stubPayload(404, { statusCode: 404, data: ghost, error: { type: 'RESOURCE_NOT_FOUND', description: 'missing' } });
+    await expect(fetchUse('ghost')).resolves.toBeNull();
+    stubPayload(404, { statusCode: 404, data: ghost, error: { type: 'RESOURCE_NOT_FOUND', description: 'missing' } });
+    await expect(fetchCurrentCompound()).resolves.toBeNull();
+    stubPayload(404, { statusCode: 404, data: ghost, error: { type: 'RESOURCE_NOT_FOUND', description: 'missing' } });
+    await expect(fetchCurrentBacBottle()).resolves.toBeNull();
+
+    stubPayload(200, { statusCode: 200, data: { id: 'c1', name: 'Fridge' } });
+    await expect(fetchCurrentCompound()).resolves.toMatchObject({ id: 'c1' });
+    stubPayload(200, { statusCode: 200, data: { id: 'b1', volume_ml: 10 } });
+    await expect(fetchCurrentBacBottle()).resolves.toMatchObject({ id: 'b1' });
+  });
+
+  it('requires 2xx plus a body for write success and uses validation copy', async () => {
+    stubPayload(199, { statusCode: 199, data: { id: 'p1', name: 'X', slug: 'x', sort_order: 1 } });
+    await expect(createPeptideType({ name: 'X' })).resolves.toMatchObject({ ok: false, status: 199 });
+    stubPayload(200, { statusCode: 200 });
+    await expect(createPeptideType({ name: 'X' })).resolves.toMatchObject({ ok: false, status: 200 });
+    stubPayload(300, { statusCode: 300, data: { id: 'p1', name: 'X', slug: 'x', sort_order: 1 } });
+    await expect(createPeptideType({ name: 'X' })).resolves.toMatchObject({ ok: false, status: 300 });
+    stubPayload(200, { statusCode: 200, data: { id: 'p1', name: 'X', slug: 'x', sort_order: 1 } });
+    await expect(createPeptideType({ name: 'X' })).resolves.toMatchObject({ ok: true, status: 200 });
+    stubPayload(422, { statusCode: 422, error: { type: 'VALIDATION_ERROR', description: '' } });
+    await expect(createPeptideType({ name: '' })).resolves.toMatchObject({
+      ok: false,
+      message: 'Check the highlighted fields.'
+    });
+  });
+
+  it('accepts 200 deletes and rejects 199 or 300', async () => {
+    stubPayload(200, { statusCode: 200 });
+    await expect(deleteCompound('c1')).resolves.toMatchObject({ ok: true, status: 200 });
+    stubPayload(199, { statusCode: 199 });
+    await expect(deleteCompound('c1')).resolves.toMatchObject({ ok: false, status: 199 });
+    stubPayload(300, { statusCode: 300 });
+    await expect(deleteCompound('c1')).resolves.toMatchObject({ ok: false, status: 300 });
+    stubPayload(200, { statusCode: 200 });
+    await expect(deleteBacBottle('b1')).resolves.toMatchObject({ ok: true, status: 200 });
+    stubPayload(199, { statusCode: 199 });
+    await expect(deleteBacBottle('b1')).resolves.toMatchObject({ ok: false, status: 199 });
+    stubPayload(200, { statusCode: 200 });
+    await expect(deleteUse('u1')).resolves.toMatchObject({ ok: true, status: 200 });
+    stubPayload(200, { statusCode: 200 });
+    await expect(deleteSyringe('s1')).resolves.toMatchObject({ ok: true, status: 200 });
+    stubPayload(200, { statusCode: 200 });
+    await expect(deleteProfile('p1')).resolves.toMatchObject({ ok: true, status: 200 });
+  });
+
+  it('omits unused use-list query keys', async () => {
+    const fetchMock = stubPayload(200, { statusCode: 200, data: [] });
+    await expect(fetchUses()).resolves.toEqual([]);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/uses');
+  });
+
+  it('prefixes reads with the given origin and keeps default origin empty', async () => {
+    const reads: Array<{ run: () => Promise<unknown>; prefixed: string; relative: string }> = [
+      { run: () => fetchPeptideTypes(ORIGIN), prefixed: `${ORIGIN}/api/v1/peptide-types`, relative: '/api/v1/peptide-types' },
+      { run: () => fetchSyringes(ORIGIN), prefixed: `${ORIGIN}/api/v1/syringes`, relative: '/api/v1/syringes' },
+      { run: () => fetchSyringe('s1', ORIGIN), prefixed: `${ORIGIN}/api/v1/syringes/s1`, relative: '/api/v1/syringes/s1' },
+      { run: () => fetchCompounds(ORIGIN), prefixed: `${ORIGIN}/api/v1/compounds`, relative: '/api/v1/compounds' },
+      { run: () => fetchOpenCompounds(ORIGIN), prefixed: `${ORIGIN}/api/v1/compounds/open`, relative: '/api/v1/compounds/open' },
+      { run: () => fetchCompound('c1', ORIGIN), prefixed: `${ORIGIN}/api/v1/compounds/c1`, relative: '/api/v1/compounds/c1' },
+      { run: () => fetchCurrentCompound(ORIGIN), prefixed: `${ORIGIN}/api/v1/compounds/current`, relative: '/api/v1/compounds/current' },
+      { run: () => fetchBacBottles(ORIGIN), prefixed: `${ORIGIN}/api/v1/bac-bottles`, relative: '/api/v1/bac-bottles' },
+      { run: () => fetchBacBottle('b1', ORIGIN), prefixed: `${ORIGIN}/api/v1/bac-bottles/b1`, relative: '/api/v1/bac-bottles/b1' },
+      { run: () => fetchCurrentBacBottle(ORIGIN), prefixed: `${ORIGIN}/api/v1/bac-bottles/current`, relative: '/api/v1/bac-bottles/current' },
+      { run: () => fetchUse('u1', ORIGIN), prefixed: `${ORIGIN}/api/v1/uses/u1`, relative: '/api/v1/uses/u1' },
+      { run: () => fetchUses({ baseUrl: ORIGIN }), prefixed: `${ORIGIN}/api/v1/uses`, relative: '/api/v1/uses' },
+      { run: () => fetchProfiles(ORIGIN), prefixed: `${ORIGIN}/api/v1/profiles`, relative: '/api/v1/profiles' }
+    ];
+
+    for (const item of reads) {
+      const prefixed = stubPayload(200, { statusCode: 200, data: [] });
+      await item.run();
+      expect(prefixed.mock.calls[0][0]).toBe(item.prefixed);
+    }
+
+    const relativeRuns: Array<{ run: () => Promise<unknown>; url: string }> = [
+      { run: () => fetchPeptideTypes(), url: '/api/v1/peptide-types' },
+      { run: () => fetchSyringes(), url: '/api/v1/syringes' },
+      { run: () => fetchSyringe('s1'), url: '/api/v1/syringes/s1' },
+      { run: () => fetchCompounds(), url: '/api/v1/compounds' },
+      { run: () => fetchOpenCompounds(), url: '/api/v1/compounds/open' },
+      { run: () => fetchCompound('c1'), url: '/api/v1/compounds/c1' },
+      { run: () => fetchCurrentCompound(), url: '/api/v1/compounds/current' },
+      { run: () => fetchBacBottles(), url: '/api/v1/bac-bottles' },
+      { run: () => fetchBacBottle('b1'), url: '/api/v1/bac-bottles/b1' },
+      { run: () => fetchCurrentBacBottle(), url: '/api/v1/bac-bottles/current' },
+      { run: () => fetchUse('u1'), url: '/api/v1/uses/u1' },
+      { run: () => fetchProfiles(), url: '/api/v1/profiles' }
+    ];
+    for (const item of relativeRuns) {
+      const fetchMock = stubPayload(200, { statusCode: 200, data: [] });
+      await item.run();
+      expect(fetchMock.mock.calls[0][0]).toBe(item.url);
+    }
+  });
+
+  it('appends view=all for full inventory lists and prefixes the origin', async () => {
+    const allViews: Array<{ run: () => Promise<unknown>; url: string }> = [
+      { run: () => fetchSyringes(ORIGIN, 'all'), url: `${ORIGIN}/api/v1/syringes?view=all` },
+      { run: () => fetchCompounds(ORIGIN, 'all'), url: `${ORIGIN}/api/v1/compounds?view=all` },
+      { run: () => fetchBacBottles(ORIGIN, 'all'), url: `${ORIGIN}/api/v1/bac-bottles?view=all` },
+      { run: () => fetchSyringes('', 'all'), url: '/api/v1/syringes?view=all' },
+      { run: () => fetchCompounds('', 'all'), url: '/api/v1/compounds?view=all' },
+      { run: () => fetchBacBottles('', 'all'), url: '/api/v1/bac-bottles?view=all' }
+    ];
+    for (const item of allViews) {
+      const fetchMock = stubPayload(200, { statusCode: 200, data: [] });
+      await item.run();
+      expect(fetchMock.mock.calls[0][0]).toBe(item.url);
+    }
+
+    const ignoredView = stubPayload(200, { statusCode: 200, data: [] });
+    await fetchSyringes('', 'open' as 'all');
+    expect(ignoredView.mock.calls[0][0]).toBe('/api/v1/syringes');
+  });
+
+  it('posts and patches with exact paths, JSON bodies, and fallback copy', async () => {
+    const writes: Array<{
+      run: () => Promise<{ ok: boolean; message?: string }>;
+      url: string;
+      method: string;
+      body?: unknown;
+      fallback: string;
+    }> = [
+      {
+        run: () => createPeptideType({ name: 'Cagri' }, ORIGIN),
+        url: `${ORIGIN}/api/v1/peptide-types`,
+        method: 'POST',
+        body: { name: 'Cagri' },
+        fallback: 'Unable to add peptide.'
+      },
+      {
+        run: () => addBacBottle({ volume_ml: 10, opened_at: '2026-08-20T12:00', notes: 'fridge' }, ORIGIN),
+        url: `${ORIGIN}/api/v1/bac-bottles`,
+        method: 'POST',
+        body: { volume_ml: 10, opened_at: '2026-08-20T12:00', notes: 'fridge' },
+        fallback: 'Unable to add bacteriostatic water.'
+      },
+      {
+        run: () => patchBacBottle('b1', { opened_at: '2026-08-21T12:00', notes: null }, ORIGIN),
+        url: `${ORIGIN}/api/v1/bac-bottles/b1`,
+        method: 'PATCH',
+        body: { opened_at: '2026-08-21T12:00', notes: null },
+        fallback: 'Unable to save bottle.'
+      },
+      {
+        run: () => burnBacBottle('b1', 2.5, ORIGIN),
+        url: `${ORIGIN}/api/v1/bac-bottles/b1/burn`,
+        method: 'POST',
+        body: { ml: 2.5 },
+        fallback: 'Unable to burn bacteriostatic water.'
+      },
+      {
+        run: () => archiveBacBottle('b1', ORIGIN),
+        url: `${ORIGIN}/api/v1/bac-bottles/b1/archive`,
+        method: 'POST',
+        body: {},
+        fallback: 'Unable to archive bottle.'
+      },
+      {
+        run: () =>
+          mixCompound(
+            {
+              peptide_type_id: 'tirzepatide',
+              peptide_mg: 10,
+              bac_water_ml: 2,
+              compounded_at: '2026-08-20T12:00',
+              name: 'Fridge A',
+              is_open: true,
+              notes: null,
+              profile_ids: ['p1']
+            },
+            ORIGIN
+          ),
+        url: `${ORIGIN}/api/v1/compounds`,
+        method: 'POST',
+        body: {
+          peptide_type_id: 'tirzepatide',
+          peptide_mg: 10,
+          bac_water_ml: 2,
+          compounded_at: '2026-08-20T12:00',
+          name: 'Fridge A',
+          is_open: true,
+          notes: null,
+          profile_ids: ['p1']
+        },
+        fallback: 'Unable to mix vial.'
+      },
+      {
+        run: () =>
+          patchCompound(
+            'c1',
+            {
+              peptide_type_id: 'sema',
+              peptide_mg: 12,
+              bac_water_ml: 2,
+              compounded_at: '2026-08-21T12:00',
+              name: 'Fridge B',
+              is_open: false,
+              notes: 'fixed',
+              profile_ids: ['p2']
+            },
+            ORIGIN
+          ),
+        url: `${ORIGIN}/api/v1/compounds/c1`,
+        method: 'PATCH',
+        body: {
+          peptide_type_id: 'sema',
+          peptide_mg: 12,
+          bac_water_ml: 2,
+          compounded_at: '2026-08-21T12:00',
+          name: 'Fridge B',
+          is_open: false,
+          notes: 'fixed',
+          profile_ids: ['p2']
+        },
+        fallback: 'Unable to save vial.'
+      },
+      {
+        run: () => adjustCompound('c1', { remaining_ml: 1.5, notes: 'lost' }, ORIGIN),
+        url: `${ORIGIN}/api/v1/compounds/c1/adjust`,
+        method: 'POST',
+        body: { remaining_ml: 1.5, notes: 'lost' },
+        fallback: 'Unable to adjust remaining volume.'
+      },
+      {
+        run: () => archiveCompound('c1', ORIGIN),
+        url: `${ORIGIN}/api/v1/compounds/c1/archive`,
+        method: 'POST',
+        body: {},
+        fallback: 'Unable to archive vial.'
+      },
+      {
+        run: () =>
+          logUse(
+            { iu: 10, syringe_id: 's1', used_at: '2026-08-20T12:00', notes: null, compound_id: 'c1', profile_id: 'p1' },
+            ORIGIN
+          ),
+        url: `${ORIGIN}/api/v1/uses`,
+        method: 'POST',
+        body: { iu: 10, syringe_id: 's1', used_at: '2026-08-20T12:00', notes: null, compound_id: 'c1', profile_id: 'p1' },
+        fallback: 'Unable to log use.'
+      },
+      {
+        run: () => patchUse('u1', { iu: 8, syringe_id: null, used_at: '2026-08-21T12:00', notes: 'n', profile_id: 'p1' }, ORIGIN),
+        url: `${ORIGIN}/api/v1/uses/u1`,
+        method: 'PATCH',
+        body: { iu: 8, syringe_id: null, used_at: '2026-08-21T12:00', notes: 'n', profile_id: 'p1' },
+        fallback: 'Unable to save use.'
+      },
+      {
+        run: () => createSyringe({ volume_ml: 1, capacity_iu: 40, label: '1 mL', is_default: false, quantity: 2 }, ORIGIN),
+        url: `${ORIGIN}/api/v1/syringes`,
+        method: 'POST',
+        body: { volume_ml: 1, capacity_iu: 40, label: '1 mL', is_default: false, quantity: 2 },
+        fallback: 'Unable to add syringe.'
+      },
+      {
+        run: () => patchSyringe('s2', { label: 'edited', is_default: true, volume_ml: 1, capacity_iu: 40 }, ORIGIN),
+        url: `${ORIGIN}/api/v1/syringes/s2`,
+        method: 'PATCH',
+        body: { label: 'edited', is_default: true, volume_ml: 1, capacity_iu: 40 },
+        fallback: 'Unable to update syringe.'
+      },
+      {
+        run: () => restockSyringe('s1', 4, ORIGIN),
+        url: `${ORIGIN}/api/v1/syringes/s1/restock`,
+        method: 'POST',
+        body: { count: 4 },
+        fallback: 'Unable to restock syringes.'
+      },
+      {
+        run: () => burnSyringe('s1', 2, ORIGIN),
+        url: `${ORIGIN}/api/v1/syringes/s1/burn`,
+        method: 'POST',
+        body: { count: 2 },
+        fallback: 'Unable to burn syringes.'
+      },
+      {
+        run: () => archiveSyringe('s1', ORIGIN),
+        url: `${ORIGIN}/api/v1/syringes/s1/archive`,
+        method: 'POST',
+        body: {},
+        fallback: 'Unable to archive syringe.'
+      },
+      {
+        run: () => createProfile({ name: 'Sam' }, ORIGIN),
+        url: `${ORIGIN}/api/v1/profiles`,
+        method: 'POST',
+        body: { name: 'Sam' },
+        fallback: 'Unable to add profile.'
+      },
+      {
+        run: () => patchProfile('p2', { name: 'Alex' }, ORIGIN),
+        url: `${ORIGIN}/api/v1/profiles/p2`,
+        method: 'PATCH',
+        body: { name: 'Alex' },
+        fallback: 'Unable to rename profile.'
+      }
+    ];
+
+    for (const item of writes) {
+      const fetchMock = stubPayload(500, { statusCode: 500, error: { type: 'SERVER_ERROR', description: '' } });
+      const result = await item.run();
+      expect(result).toMatchObject({ ok: false, message: item.fallback });
+      expectFetch(fetchMock, item.url, { method: item.method, headers: JSON_HEADERS, body: item.body });
+    }
+  });
+
+  it('deletes at the resource URL with a fallback message', async () => {
+    const deletes: Array<{
+      run: () => Promise<{ ok: boolean; message?: string }>;
+      url: string;
+      fallback: string;
+    }> = [
+      { run: () => deleteBacBottle('b1', ORIGIN), url: `${ORIGIN}/api/v1/bac-bottles/b1`, fallback: 'Unable to delete bottle.' },
+      { run: () => deleteCompound('c1', ORIGIN), url: `${ORIGIN}/api/v1/compounds/c1`, fallback: 'Unable to delete vial.' },
+      { run: () => deleteUse('u1', ORIGIN), url: `${ORIGIN}/api/v1/uses/u1`, fallback: 'Unable to delete use.' },
+      { run: () => deleteSyringe('s1', ORIGIN), url: `${ORIGIN}/api/v1/syringes/s1`, fallback: 'Unable to delete syringe.' },
+      { run: () => deleteProfile('p2', ORIGIN), url: `${ORIGIN}/api/v1/profiles/p2`, fallback: 'Unable to delete profile.' }
+    ];
+    for (const item of deletes) {
+      const fetchMock = stubPayload(500, { statusCode: 500, error: { type: 'SERVER_ERROR', description: '' } });
+      const result = await item.run();
+      expect(result).toMatchObject({ ok: false, message: item.fallback });
+      expectFetch(fetchMock, item.url, { method: 'DELETE' });
+    }
   });
 });

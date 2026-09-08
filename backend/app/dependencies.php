@@ -13,12 +13,14 @@ use App\Domain\Auth\GoogleOAuthClient;
 use App\Domain\Auth\IdGenerator;
 use App\Domain\Auth\OauthStateService;
 use App\Domain\Auth\PasswordHasher;
+use App\Domain\Auth\SessionIssuer;
 use App\Domain\Auth\SessionService;
 use App\Domain\Auth\SystemClock;
 use App\Domain\Auth\UserProvisioner;
 use App\Domain\Auth\UserStorePort;
 use App\Domain\Crypto\AmkRotator;
 use App\Domain\Crypto\Crypto;
+use App\Domain\Dose\ArchivePolicy;
 use App\Domain\Dose\BacBottleService;
 use App\Domain\Dose\CompoundService;
 use App\Domain\Dose\DoseCalculator;
@@ -100,6 +102,9 @@ return function (ContainerBuilder $containerBuilder): void {
         EmailNormalizer::class => static fn (): EmailNormalizer => new EmailNormalizer(),
         CredentialParser::class => static fn (): CredentialParser => new CredentialParser(),
         DoseCalculator::class => static fn (): DoseCalculator => new DoseCalculator(),
+        ArchivePolicy::class => static function (ContainerInterface $c): ArchivePolicy {
+            return new ArchivePolicy($c->get(DoseCalculator::class));
+        },
         SyringeService::class => static function (ContainerInterface $c): SyringeService {
             return new SyringeService($c->get(IdGenerator::class));
         },
@@ -108,6 +113,7 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(DoseCalculator::class),
                 $c->get(IdGenerator::class),
                 $c->get(Clock::class),
+                $c->get(ArchivePolicy::class),
             );
         },
         UserPeptideService::class => static function (ContainerInterface $c): UserPeptideService {
@@ -132,6 +138,7 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(ProfileService::class),
                 $c->get(IdGenerator::class),
                 $c->get(Clock::class),
+                $c->get(ArchivePolicy::class),
             );
         },
         UseService::class => static function (ContainerInterface $c): UseService {
@@ -181,6 +188,12 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(UserStorePort::class),
             );
         },
+        SessionIssuer::class => static function (ContainerInterface $c): SessionIssuer {
+            return new SessionIssuer(
+                $c->get(SessionService::class),
+                $c->get(SessionCookie::class),
+            );
+        },
         SessionService::class => static function (ContainerInterface $c): SessionService {
             return new SessionService(
                 $c->get(\App\Domain\Auth\SessionRepository::class),
@@ -213,8 +226,7 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(GoogleOAuthClient::class),
                 $c->get(OauthStateService::class),
                 $c->get(AuthService::class),
-                $c->get(SessionService::class),
-                $c->get(SessionCookie::class),
+                $c->get(\App\Domain\Auth\SessionIssuer::class),
                 (string) $settings->get('appUrl'),
             );
         },

@@ -10,10 +10,9 @@ use App\Domain\Auth\GoogleAccountConflictException;
 use App\Domain\Auth\GoogleOAuthClient;
 use App\Domain\Auth\GoogleOAuthException;
 use App\Domain\Auth\OauthStateService;
-use App\Domain\Auth\SessionService;
+use App\Domain\Auth\SessionIssuer;
 use App\Domain\Auth\UnverifiedGoogleEmailException;
 use App\Domain\Auth\ValidationException;
-use App\Infrastructure\Http\SessionCookie;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Log\LoggerInterface;
 
@@ -24,8 +23,7 @@ final class GoogleCallbackAction extends Action
         private readonly GoogleOAuthClient $google,
         private readonly OauthStateService $oauthStates,
         private readonly AuthService $auth,
-        private readonly SessionService $sessions,
-        private readonly SessionCookie $cookie,
+        private readonly SessionIssuer $sessions,
         private readonly string $appUrl,
     ) {
         parent::__construct($logger);
@@ -54,10 +52,7 @@ final class GoogleCallbackAction extends Action
             return $this->redirectToLogin();
         }
 
-        $session = $this->sessions->create($user->id);
-        $response = $this->redirectToApp();
-
-        return $this->cookie->apply($response, $session->id, $this->sessions->ttlSeconds());
+        return $this->sessions->issue($this->redirectToApp(), $user->id);
     }
 
     private function redirectToLogin(): Response

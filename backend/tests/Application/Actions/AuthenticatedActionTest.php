@@ -49,6 +49,20 @@ class AuthenticatedActionTest extends TestCase
 
                 return $result;
             }
+
+            public function exportPlaintext(string $userId, string $dek): string
+            {
+                return '';
+            }
+
+            public function hasPreMigrationBackup(string $userId): bool
+            {
+                return false;
+            }
+
+            public function restorePreMigrationBackup(string $userId): void
+            {
+            }
         };
 
         $action = new class (new NullLogger(), $store, $order) extends AuthenticatedAction {
@@ -109,6 +123,20 @@ class AuthenticatedActionTest extends TestCase
             public function withUnlocked(string $userId, string $dek, callable $callback): mixed
             {
                 return $callback(new PDO('sqlite::memory:'));
+            }
+
+            public function exportPlaintext(string $userId, string $dek): string
+            {
+                return '';
+            }
+
+            public function hasPreMigrationBackup(string $userId): bool
+            {
+                return false;
+            }
+
+            public function restorePreMigrationBackup(string $userId): void
+            {
             }
         };
     }

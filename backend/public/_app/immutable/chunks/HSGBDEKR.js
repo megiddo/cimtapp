@@ -1,0 +1,1 @@
+const e=[{path:"/inventory/vials",title:"Vials",kind:"vials"},{path:"/inventory/water",title:"BAC",kind:"water"},{path:"/inventory/syringes",title:"Syringes",kind:"syringes"}];function s(t){const n=e.find(i=>i.kind===t);return(n==null?void 0:n.path)??"/inventory"}export{e as I,s as f};

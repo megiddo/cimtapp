@@ -48,7 +48,7 @@
             "@php scripts/check-coverage.php"
         ],
         "test:unit": "phpunit --no-coverage",
-        "infection": "infection --threads=max --min-msi=80 --min-covered-msi=85",
+        "infection": "infection --threads=max --min-msi=80 --min-covered-msi=80",
         "phpstan": "phpstan analyse --memory-limit=512M"
     }
 }

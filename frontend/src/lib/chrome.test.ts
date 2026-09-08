@@ -78,10 +78,14 @@ describe('isTabActive', () => {
     expect(isTabActive('/use/new', '/use/new')).toBe(true);
     expect(isTabActive('/inventory', '/inventory')).toBe(true);
     expect(isTabActive('/inventory/new', '/inventory')).toBe(true);
+    expect(isTabActive('/inventory/vials', '/inventory')).toBe(true);
+    expect(isTabActive('/inventory/water', '/inventory')).toBe(true);
+    expect(isTabActive('/inventory/syringes', '/inventory')).toBe(true);
     expect(isTabActive('/inventory/abc', '/inventory')).toBe(true);
     expect(isTabActive('/history/edit', '/history')).toBe(true);
     expect(isTabActive('/inventory', '/history')).toBe(false);
     expect(isTabActive('/use', '/use/new')).toBe(false);
+    expect(isTabActive('/inventory/new', '/history')).toBe(false);
   });
 });
 
@@ -97,6 +101,9 @@ describe('titleForPath', () => {
     expect(titleForPath('/inventory/syringes/new')).toBe('Add syringe');
     expect(titleForPath('/inventory/syringes/abc')).toBe('Edit');
     expect(titleForPath('/inventory/peptides/new')).toBe('Add peptide');
+    expect(titleForPath('/inventory/vials')).toBe('Vials');
+    expect(titleForPath('/inventory/water')).toBe('BAC');
+    expect(titleForPath('/inventory/syringes')).toBe('Syringes');
     expect(titleForPath('/inventory/abc')).toBe('Edit');
     expect(titleForPath('/history')).toBe('History');
     expect(titleForPath('/history/1')).toBe('Edit');
@@ -105,6 +112,16 @@ describe('titleForPath', () => {
     expect(titleForPath('/settings')).toBe('Settings');
     expect(titleForPath('/settings/syringes')).toBe('Settings');
     expect(titleForPath('/unknown')).toBe('PepTrack');
+    expect(titleForPath('/prefix/inventory/water/abc')).toBe('PepTrack');
+    expect(titleForPath('/inventory/water/abc/extra')).toBe('Inventory');
+    expect(titleForPath('/prefix/inventory/syringes/abc')).toBe('PepTrack');
+    expect(titleForPath('/inventory/syringes/abc/extra')).toBe('Inventory');
+    expect(titleForPath('/prefix/inventory/abc')).toBe('PepTrack');
+    expect(titleForPath('/inventory/abc/extra')).toBe('Inventory');
+    expect(titleForPath('/prefix/history/1')).toBe('PepTrack');
+    expect(titleForPath('/history/1/extra')).toBe('History');
+    expect(titleForPath('/use')).toBe('PepTrack');
+    expect(titleForPath('/inventory/')).toBe('Inventory');
   });
 });
 
@@ -116,11 +133,22 @@ describe('backHrefForPath', () => {
     expect(backHrefForPath('/inventory/syringes/new')).toBe('/inventory');
     expect(backHrefForPath('/inventory/syringes/abc')).toBe('/inventory');
     expect(backHrefForPath('/inventory/peptides/new')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/vials')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/water')).toBe('/inventory');
+    expect(backHrefForPath('/inventory/syringes')).toBe('/inventory');
     expect(backHrefForPath('/inventory/abc')).toBe('/inventory');
     expect(backHrefForPath('/history/abc')).toBe('/history');
     expect(backHrefForPath('/history')).toBeNull();
     expect(backHrefForPath('/inventory')).toBeNull();
     expect(backHrefForPath('/')).toBeNull();
+    expect(backHrefForPath('/prefix/inventory/water/abc')).toBeNull();
+    expect(backHrefForPath('/inventory/water/abc/extra')).toBeNull();
+    expect(backHrefForPath('/prefix/inventory/syringes/abc')).toBeNull();
+    expect(backHrefForPath('/inventory/syringes/abc/extra')).toBeNull();
+    expect(backHrefForPath('/prefix/inventory/abc')).toBeNull();
+    expect(backHrefForPath('/inventory/abc/extra')).toBeNull();
+    expect(backHrefForPath('/prefix/history/abc')).toBeNull();
+    expect(backHrefForPath('/history/abc/extra')).toBeNull();
   });
 });
 
@@ -134,9 +162,21 @@ describe('needsStickyCta', () => {
     expect(needsStickyCta('/inventory/syringes/new')).toBe(true);
     expect(needsStickyCta('/inventory/syringes/abc')).toBe(true);
     expect(needsStickyCta('/inventory/peptides/new')).toBe(true);
+    expect(needsStickyCta('/inventory/vials')).toBe(false);
+    expect(needsStickyCta('/inventory/water')).toBe(false);
+    expect(needsStickyCta('/inventory/syringes')).toBe(false);
     expect(needsStickyCta('/inventory/abc')).toBe(true);
     expect(needsStickyCta('/history/abc')).toBe(true);
     expect(needsStickyCta('/history')).toBe(false);
     expect(needsStickyCta('/')).toBe(false);
+    expect(needsStickyCta('/prefix/inventory/water/abc')).toBe(false);
+    expect(needsStickyCta('/inventory/water/abc/extra')).toBe(false);
+    expect(needsStickyCta('/prefix/inventory/syringes/abc')).toBe(false);
+    expect(needsStickyCta('/inventory/syringes/abc/extra')).toBe(false);
+    expect(needsStickyCta('/prefix/inventory/abc')).toBe(false);
+    expect(needsStickyCta('/inventory/abc/extra')).toBe(false);
+    expect(needsStickyCta('/prefix/history/abc')).toBe(false);
+    expect(needsStickyCta('/history/abc/extra')).toBe(false);
+    expect(needsStickyCta('/use')).toBe(false);
   });
 });

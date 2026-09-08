@@ -22,6 +22,7 @@ final class UserSchemaVersionDetector
         '004_named_open_vials.sql' => 4,
         '005_archive_and_adjustments.sql' => 5,
         '006_profiles.sql' => 6,
+        '007_syringe_archive.sql' => 7,
     ];
 
     public function detect(PDO $pdo): int
@@ -90,6 +91,9 @@ final class UserSchemaVersionDetector
 
     private function fromSchemaShape(PDO $pdo): int
     {
+        if ($this->hasColumn($pdo, 'syringe_profiles', 'archived_at')) {
+            return UserStoreFormat::V7SyringeArchive->value;
+        }
         if ($this->tableExists($pdo, 'profiles')) {
             return UserStoreFormat::V6Profiles->value;
         }

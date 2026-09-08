@@ -7,8 +7,8 @@ namespace App\Application\Actions\Auth;
 use App\Application\Actions\Action;
 use App\Domain\Auth\AuthService;
 use App\Domain\Auth\CredentialParser;
-use App\Domain\Auth\SessionService;
-use App\Infrastructure\Http\SessionCookie;
+use App\Domain\Auth\SessionIssuer;
+use App\Domain\Auth\UserMeMapper;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Log\LoggerInterface;
 
@@ -17,8 +17,7 @@ final class RegisterAction extends Action
     public function __construct(
         LoggerInterface $logger,
         private readonly AuthService $auth,
-        private readonly SessionService $sessions,
-        private readonly SessionCookie $cookie,
+        private readonly SessionIssuer $sessions,
         private readonly CredentialParser $parser,
     ) {
         parent::__construct($logger);
@@ -28,9 +27,8 @@ final class RegisterAction extends Action
     {
         $credentials = $this->parser->parse($this->getFormData());
         $user = $this->auth->register($credentials['email'], $credentials['password']);
-        $session = $this->sessions->create($user->id);
-        $response = $this->respondWithData($user->toMeArray(), 201);
+        $response = $this->respondWithData(UserMeMapper::fromUser($user), 201);
 
-        return $this->cookie->apply($response, $session->id, $this->sessions->ttlSeconds());
+        return $this->sessions->issue($response, $user->id);
     }
 }

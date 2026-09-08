@@ -35,12 +35,6 @@ final class User
      */
     public function toMeArray(): array
     {
-        return [
-            'email' => $this->email,
-            'has_password' => $this->hasPassword(),
-            'has_google' => $this->hasGoogle(),
-            'remainder' => null,
-            'open_vials' => [],
-        ];
+        return UserMeMapper::fromUser($this);
     }
 }

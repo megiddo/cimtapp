@@ -6,6 +6,7 @@
   import { OFFLINE_SAVE_MESSAGE, saveWhileOnline } from '$lib/offline';
   import { firstFieldError, type FieldMap } from '$lib/payload';
   import {
+    archiveSyringe,
     burnSyringe,
     deleteSyringe,
     fetchSyringe,
@@ -23,6 +24,7 @@
   let count = $state('1');
   let pending = $state(false);
   let pendingStock = $state(false);
+  let pendingArchive = $state(false);
   let deleting = $state(false);
   let fields = $state<FieldMap>({});
   let formError = $state('');
@@ -38,6 +40,8 @@
       ? syringeLabel(volume, capacity)
       : ''
   );
+  const empty = $derived(syringe !== null && syringe.quantity === 0);
+  const archived = $derived(syringe !== null && syringe.archived_at !== null);
 
   onMount(async () => {
     const id = page.params.id;
@@ -128,6 +132,32 @@
     }
   }
 
+  async function onArchive() {
+    const target = syringe;
+    if (target === null || !empty || archived) {
+      return;
+    }
+    const ok = window.confirm('Hide this empty syringe from inventory?');
+    if (!ok) {
+      return;
+    }
+    pendingArchive = true;
+    formError = '';
+    toast = '';
+    try {
+      const result = await saveWhileOnline(() => archiveSyringe(target.id));
+      pendingArchive = false;
+      if (result.ok) {
+        await goto('/inventory');
+        return;
+      }
+      formError = result.message;
+    } catch {
+      pendingArchive = false;
+      toast = OFFLINE_SAVE_MESSAGE;
+    }
+  }
+
   async function onDelete() {
     const target = syringe;
     if (target === null || onlySyringe) {
@@ -196,13 +226,13 @@
       <button
         type="button"
         class="secondary stock"
-        disabled={pendingStock || pending || deleting || stockCount === null}
+        disabled={pendingStock || pending || pendingArchive || deleting || stockCount === null}
         onclick={() => onStock('use')}>Use</button
       >
       <button
         type="button"
         class="secondary stock"
-        disabled={pendingStock || pending || deleting || stockCount === null}
+        disabled={pendingStock || pending || pendingArchive || deleting || stockCount === null}
         onclick={() => onStock('restock')}>Restock</button
       >
     </div>
@@ -211,7 +241,7 @@
     {/if}
 
     {#if !syringe.is_default}
-      <button type="button" class="secondary" disabled={pending || deleting} onclick={onSetDefault}>
+      <button type="button" class="secondary" disabled={pending || pendingArchive || deleting} onclick={onSetDefault}>
         Set default
       </button>
     {/if}
@@ -221,16 +251,27 @@
     {/if}
 
     <div class="sticky-cta">
-      <button type="submit" disabled={pending || deleting || volume === null || capacity === null}>
+      <button type="submit" disabled={pending || pendingArchive || deleting || volume === null || capacity === null}>
         {pending ? 'Saving…' : 'Save'}
       </button>
     </div>
   </form>
 
+  {#if empty && !archived}
+    <button
+      class="secondary below-fold"
+      type="button"
+      disabled={pending || pendingStock || pendingArchive || deleting}
+      onclick={onArchive}
+    >
+      {pendingArchive ? 'Archiving…' : 'Archive empty syringe'}
+    </button>
+  {/if}
+
   {#if onlySyringe}
     <p class="muted below-fold">Keep at least one syringe type.</p>
   {:else}
-    <button class="danger" type="button" disabled={pending || deleting} onclick={onDelete}>
+    <button class="danger" type="button" disabled={pending || pendingArchive || deleting} onclick={onDelete}>
       {deleting ? 'Deleting…' : 'Delete from inventory'}
     </button>
   {/if}

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Persistence\UserSchema;
 
+use App\Domain\Auth\IdGenerator;
+
 /**
  * Ordered strategies that mutate a user sqlite to {@see UserStoreFormat::current()}.
  */
@@ -26,7 +28,8 @@ final class UserSchemaCatalog
             new AddUserPeptideTypes($dir),
             new AddNamedOpenVials($dir),
             new AddArchiveAndAdjustments($dir),
-            new AddProfiles($dir),
+            new AddProfiles($dir, new DefaultProfileBackfill(new IdGenerator())),
+            new AddSyringeArchive($dir),
         ]));
     }
 

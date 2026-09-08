@@ -43,6 +43,17 @@ describe('session gating', () => {
       status: 401
     });
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/me', { credentials: 'include' });
+
+    const me = { email: 'a@b.c', has_password: true, has_google: false, remainder: null };
+    await expect(
+      probeSession(
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 401,
+          json: async () => ({ statusCode: 401, data: me })
+        })
+      )
+    ).resolves.toEqual({ authenticated: false, me: null, status: 401 });
   });
 
   it('returns me when GET /me succeeds', async () => {
@@ -84,5 +95,15 @@ describe('session gating', () => {
         })
       )
     ).resolves.toMatchObject({ authenticated: false, status: 200 });
+
+    await expect(
+      probeSession(
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({ statusCode: 200, data: { email: 'a@b.c' } })
+        })
+      )
+    ).resolves.toMatchObject({ authenticated: false, me: null, status: 200 });
   });
 });

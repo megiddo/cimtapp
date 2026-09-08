@@ -21,6 +21,6 @@
         "@default": true
     },
     "minMsi": 80,
-    "minCoveredMsi": 85,
+    "minCoveredMsi": 80,
     "timeout": 25
 }

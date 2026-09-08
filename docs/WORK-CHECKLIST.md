@@ -8,10 +8,10 @@ CI and local scripts **must fail** below these floors. Details: [TESTING.md](TES
 
 | Gate | Floor | Why |
 | --- | --- | --- |
-| PHPUnit line coverage | **95%** of `backend/src` (exclude tests, vendor, generated, `public/`) | Domain/crypto will live here; untested lines are how wrap/unwrap bugs hide. |
-| Vitest line coverage | **95%** of `frontend/src/lib` production TS | API client and later dose helpers must stay honest. |
-| Infection | **minMsi 80**, **minCoveredMsi 85** | Domain/crypto code must kill mutants. 80 MSI is the fail floor given 95% coverage — equivalent mutants exist, but surviving “real” mutants are not acceptable. |
-| Stryker | **thresholds.break 70**, **thresholds.high 80** | Svelte UI has more equivalent mutants than PHP domain code; 70 is the fail floor, 80 is the healthy band. |
+| PHPUnit line coverage | **90%** of `backend/src` (exclude tests, vendor, generated, `public/`) | Domain/crypto live here; untested lines are how wrap/unwrap bugs hide. 90% leaves room for equivalent constructor/cleanup lines. |
+| Vitest line coverage | **90%** of `frontend/src/lib` production TS | API client and later dose helpers must stay honest. |
+| Infection | **minMsi 80**, **minCoveredMsi 80** | Domain/crypto code must kill mutants. One 80% mutation number for PHP and JS — equivalent mutants exist, but surviving “real” mutants are not acceptable. |
+| Stryker | **thresholds.break 80**, **thresholds.high 80** | SPA client is held to the same mutation bar as PHP. Markup-only `.svelte` stays out of the mutate glob. |
 
 ## Phase 0 — Foundations
 
@@ -64,4 +64,14 @@ Gate: usable one-handed on iPhone SE-width Safari with empty/error states; tests
 - [x] DEK rewrap helper for AMK rotation; confirm old ciphertext still opens
 
 v1 is complete. Out of scope remains: new peptide types, household sharing, zero-knowledge keys, charts, CSV, reminders.
+
+## Next — v0.3
+
+Plan: [v0.3.md](v0.3.md) — frontend and backend pattern splits, inventory open/archived + full lists.
+
+- [x] Milestone 0 — testing floors live: PHPUnit/Vitest **90%** line coverage; Infection **80 / 80**; Stryker **break 80 / high 80** ([v0.3-testing.md](v0.3-testing.md))
+- [x] Milestone 1 — frontend design patterns on `0.3.3-frontend`: `readAction` / `DomainResult` / repositories, `InventorySection` + full-list routes, log wizard, settings composite, chrome titles for Vials / BAC / Syringes.
+- [x] Milestone 2 — backend design-pattern **API/schema** on `0.3.2-backend-inventory`: `UserStorePort` backup methods; `StockItem` / `ArchivePolicy` / `StockList` wrappers.
+- [x] Milestone 3 — inventory **API/schema** on `0.3.2-backend-inventory`: v7 syringe `archived_at`, `view=all`, syringe archive, `is_open` close-state collapsed. Client fetchers + syringe Archive button landed; sheet/full-list pages stay milestone 1.
+- [x] Leftover splits **done** on `0.3.4-hygiene`: backend Compound/BAC/syringe/use/profile/auth/UserStore extracts; frontend CSS `@layer` + chrome file split.
 

@@ -8,6 +8,7 @@ use App\Application\Actions\AuthenticatedAction;
 use App\Domain\Auth\AuthContext;
 use App\Domain\Auth\AuthService;
 use App\Domain\Auth\CredentialParser;
+use App\Domain\Auth\UserMeMapper;
 use App\Domain\Auth\UserStorePort;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Log\LoggerInterface;
@@ -30,6 +31,6 @@ final class SetPasswordAction extends AuthenticatedAction
         $context = $this->request->getAttribute(AuthContext::class);
         $user = $this->auth->setPassword($context->user, $credentials['password'], $this->userPdo());
 
-        return $this->respondWithData($user->toMeArray());
+        return $this->respondWithData(UserMeMapper::fromUser($user));
     }
 }

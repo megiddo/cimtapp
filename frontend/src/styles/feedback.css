@@ -1,0 +1,103 @@
+.field-error {
+  color: #8a1f1f;
+  font-size: 0.9rem;
+}
+
+.banner {
+  margin-bottom: 0.85rem;
+  color: #8a1f1f;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.hero .peptide {
+  font-weight: 650;
+}
+
+.hero .mg {
+  font-size: 2.4rem;
+  font-weight: 750;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.hero.warning .mg {
+  color: #8a5a10;
+}
+
+.hero.danger .mg {
+  color: #8a1f1f;
+}
+
+.hero .meta,
+.muted {
+  color: #555;
+  font-size: 0.95rem;
+}
+
+.tone {
+  font-size: 0.95rem;
+}
+
+.tone.warning {
+  color: #8a5a10;
+}
+
+.tone.danger {
+  color: #8a1f1f;
+}
+
+.danger {
+  min-height: var(--tap-min);
+  width: 100%;
+  margin-top: 1.5rem;
+  border: 1px solid #8a1f1f;
+  border-radius: 8px;
+  background: #fff;
+  color: #8a1f1f;
+  font-weight: 650;
+}
+
+.danger:disabled {
+  opacity: 0.55;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 650;
+  vertical-align: middle;
+}
+
+.preview {
+  margin: 0.75rem 0;
+  font-weight: 650;
+}
+
+.toast {
+  box-sizing: border-box;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #111;
+  color: #fff;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
