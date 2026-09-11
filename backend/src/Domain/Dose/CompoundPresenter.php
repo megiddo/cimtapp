@@ -41,7 +41,7 @@ final class CompoundPresenter
         return [
             'id' => $id,
             'name' => (string) $row['name'],
-            'is_open' => $archivedAt === null,
+            'is_open' => $archivedAt === null && (int) ($row['is_open'] ?? 1) === 1,
             'archived_at' => $archivedAt,
             'peptide_type_id' => (string) $row['peptide_type_id'],
             'peptide_type_slug' => (string) $row['peptide_type_slug'],

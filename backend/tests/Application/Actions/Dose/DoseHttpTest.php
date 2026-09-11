@@ -186,21 +186,31 @@ class DoseHttpTest extends TestCase
         $this->assertSame(422, $tooLong->getStatusCode());
         $this->assertSame(['name' => [DoseConfig::VIAL_NAME_TOO_LONG]], $this->json($tooLong)['error']['fields']);
 
-        $ignoredClose = $this->json($this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $sema['id'], [
+        $closed = $this->json($this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $sema['id'], [
             'is_open' => false,
         ], $sid))['data'];
-        $this->assertTrue($ignoredClose['is_open']);
-        $this->assertNull($ignoredClose['archived_at']);
+        $this->assertFalse($closed['is_open']);
+        $this->assertNull($closed['archived_at']);
 
         $stillOpen = $this->json($this->authed($app, 'GET', '/api/v1/compounds/open', $sid))['data'];
-        $this->assertCount(3, $stillOpen);
-        $this->assertSame(['Travel', 'Tirzepatide', 'Fridge A'], array_map(
+        $this->assertCount(2, $stillOpen);
+        $this->assertSame(['Tirzepatide', 'Fridge A'], array_map(
             static fn (array $row): string => $row['name'],
             $stillOpen,
         ));
+        $sheet = $this->json($this->authed($app, 'GET', '/api/v1/compounds', $sid))['data'];
+        $this->assertCount(3, $sheet);
+        $this->assertSame(['Travel', 'Tirzepatide', 'Fridge A'], array_map(
+            static fn (array $row): string => $row['name'],
+            $sheet,
+        ));
         $current = $this->json($this->authed($app, 'GET', '/api/v1/compounds/current', $sid))['data'];
-        $this->assertSame($sema['id'], $current['id']);
+        $this->assertSame('Tirzepatide', $current['name']);
+        $this->assertNotSame($sema['id'], $current['id']);
         $this->assertTrue($current['is_open']);
+        $meAfterClose = $this->json($this->authed($app, 'GET', '/api/v1/me', $sid))['data'];
+        $this->assertCount(2, $meAfterClose['open_vials']);
+        $this->assertSame($current['id'], $meAfterClose['remainder']['compound_id']);
 
         $nullOpen = $this->authedJson($app, 'PATCH', '/api/v1/compounds/' . $fridge['id'], [
             'is_open' => null,

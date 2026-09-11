@@ -32,7 +32,7 @@ final class CompoundRepository
     public function currentRow(PDO $pdo): ?array
     {
         $stmt = $pdo->query(
-            'SELECT * FROM compounds WHERE archived_at IS NULL ORDER BY compounded_at DESC, id DESC LIMIT 1'
+            'SELECT * FROM compounds WHERE is_open = 1 AND archived_at IS NULL ORDER BY compounded_at DESC, id DESC LIMIT 1'
         );
         $row = $stmt === false ? false : $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -85,7 +85,8 @@ final class CompoundRepository
                 compounded_at = :compounded_at,
                 notes = :notes,
                 bac_bottle_id = :bac_bottle_id,
-                name = :name
+                name = :name,
+                is_open = :is_open
              WHERE id = :id'
         );
         $stmt->execute($values);
