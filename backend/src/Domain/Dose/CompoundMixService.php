@@ -86,6 +86,10 @@ final class CompoundMixService
             : (string) $existing['compounded_at'];
         $notes = $fields->has('notes') ? $fields->optionalString('notes') : $existing['notes'];
         $name = $this->vialName($fields, (string) $existing['peptide_type_name'], (string) $existing['name']);
+        $isOpen = $this->vialOpen($fields, (bool) $existing['is_open']);
+        if ($existing['archived_at'] !== null) {
+            $isOpen = false;
+        }
 
         $mixChanged = $this->doses->roundMg((float) $existing['peptide_mg']) !== $peptideMg
             || abs((float) $existing['bac_water_ml'] - $bacWaterMl) > 1e-9;
@@ -117,6 +121,7 @@ final class CompoundMixService
             ':notes' => $notes,
             ':bac_bottle_id' => $bottleId,
             ':name' => $name,
+            ':is_open' => $isOpen ? 1 : 0,
         ]);
 
         if ($mixChanged) {
@@ -177,6 +182,15 @@ final class CompoundMixService
         }
 
         return $name;
+    }
+
+    private function vialOpen(FieldParser $fields, bool $fallback): bool
+    {
+        if (!$fields->has('is_open')) {
+            return $fallback;
+        }
+
+        return $fields->optionalBool('is_open') ?? $fallback;
     }
 
     private function timestamp(): string

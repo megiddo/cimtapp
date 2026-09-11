@@ -48,7 +48,10 @@ final class CompoundQueryService
      */
     public function listOpen(PDO $pdo): array
     {
-        return $this->list($pdo, StockList::openOnly());
+        return array_values(array_filter(
+            $this->list($pdo, StockList::openOnly()),
+            static fn (array $row): bool => $row['is_open'] === true,
+        ));
     }
 
     /**
