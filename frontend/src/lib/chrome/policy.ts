@@ -42,7 +42,7 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     backHref: '/inventory',
     stickyCta: true
   },
-  { test: (pathname) => pathname === '/inventory', title: 'Inventory', backHref: null, stickyCta: true },
+  { test: (pathname) => pathname === '/inventory', title: 'Inventory', backHref: null, stickyCta: false },
   { test: (pathname) => pathname.startsWith('/inventory/'), title: 'Inventory', backHref: null, stickyCta: false },
   { test: (pathname) => /^\/history\/[^/]+$/.test(pathname), title: 'Edit', backHref: '/history', stickyCta: true },
   { test: (pathname) => pathname === '/history' || pathname.startsWith('/history/'), title: 'History', backHref: null, stickyCta: false },

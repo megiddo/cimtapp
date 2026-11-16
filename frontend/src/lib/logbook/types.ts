@@ -5,14 +5,33 @@ export type Person = {
   removed_at: string | null;
 };
 
-export type CurrentVial = {
+export type VialPerson = {
+  person_id: string;
+  name: string;
+  drawn_mg: number;
+};
+
+export type VialSummary = {
   id: string;
+  peptide_id: string;
+  peptide_name: string;
   display_name: string;
   lid_color_name: string;
   peptide_mg: number;
   bac_water_ml: number;
   concentration_mg_per_ml: number;
+  mg_left: number;
   probably_empty: boolean;
+  people: VialPerson[];
+};
+
+export type CurrentVial = VialSummary;
+
+export type Peptide = {
+  id: string;
+  name: string;
+  slug: string;
+  removed_at: string | null;
 };
 
 export type LogDefaults = {

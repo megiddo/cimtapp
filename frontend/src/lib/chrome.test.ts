@@ -154,7 +154,7 @@ describe('backHrefForPath', () => {
 describe('needsStickyCta', () => {
   it('is true on log, mix, inventory, vial edit, and use edit', () => {
     expect(needsStickyCta('/use/new')).toBe(true);
-    expect(needsStickyCta('/inventory')).toBe(true);
+    expect(needsStickyCta('/inventory')).toBe(false);
     expect(needsStickyCta('/inventory/new')).toBe(true);
     expect(needsStickyCta('/inventory/water/new')).toBe(true);
     expect(needsStickyCta('/inventory/water/abc')).toBe(true);

@@ -25,6 +25,9 @@
   import IuField from './IuField.svelte';
   import LogList from './LogList.svelte';
   import NameModal from './NameModal.svelte';
+  import VialModal from './VialModal.svelte';
+  import EmptyVialBanner from './EmptyVialBanner.svelte';
+  import { prefillNew, prefillRecompound, prefillRecalculate, type VialModalPrefill } from './vialModalPrefill';
 
   type Props = {
     editId?: string;
@@ -50,6 +53,9 @@
   let editing = $state(false);
   let syringeVolume = $state(0.5);
   let syringeCapacity = $state(50);
+  let probablyEmpty = $state(false);
+  let vialModalOpen = $state(false);
+  let vialModalSeed = $state<VialModalPrefill | null>(null);
 
   const iu = $derived(parseIuInput(iuText));
   const selectedVial = $derived(vials.find((item) => item.id === vialId) ?? null);
@@ -66,6 +72,10 @@
   );
   const canSave = $derived(canSubmitLog(personId, vialId, iuText) && !pending);
   const sourceCaption = $derived(formatSourceCaption(sourceLoggedAt));
+  const lidColors = $derived(
+    [...new Set(vials.map((vial) => vial.lid_color_name).filter((name) => name !== ''))]
+  );
+  const showEmptyBanner = $derived(!editing && (probablyEmpty || selectedVial?.probably_empty === true));
 
   async function loadPerson(person: string) {
     personId = person;
@@ -81,6 +91,7 @@
     isLastDraw = seed.isLastDraw;
     loggedAt = seed.loggedAt;
     sourceLoggedAt = seed.sourceLoggedAt;
+    probablyEmpty = defaults.probably_empty;
     recent = await fetchLogEntries(person, { limit: 20 });
   }
 
@@ -162,6 +173,35 @@
     fields = outcome.fields;
   }
 
+  function openMakeVial() {
+    vialModalSeed = prefillNew(personId === '' ? [] : [personId]);
+    vialModalOpen = true;
+  }
+
+  function openRecompound() {
+    if (selectedVial === null) {
+      return;
+    }
+    vialModalSeed = prefillRecompound(selectedVial);
+    vialModalOpen = true;
+  }
+
+  function openRecalculate() {
+    if (selectedVial === null) {
+      return;
+    }
+    const latest = recent[0] ?? null;
+    vialModalSeed = prefillRecalculate(selectedVial, latest);
+    vialModalOpen = true;
+  }
+
+  async function onVialSaved() {
+    vials = await fetchCurrentVials();
+    if (personId !== '') {
+      await loadPerson(personId);
+    }
+  }
+
   async function onDelete() {
     if (editId === undefined || !confirm('Delete this log entry?')) {
       return;
@@ -192,9 +232,13 @@
   {#if vials.length === 0}
     <div class="empty-state">
       <p>Make a vial for this person before logging.</p>
-      <p class="muted">Vial mixing arrives on the Inventory tab in the next milestone.</p>
+      <button type="button" class="chip" onclick={openMakeVial}>Make a vial</button>
     </div>
   {:else}
+    {#if showEmptyBanner}
+      <EmptyVialBanner onrecompound={openRecompound} onrecalculate={openRecalculate} />
+    {/if}
+
     <form class="auth-form has-sticky" onsubmit={onSubmit}>
       <label>
         When
@@ -258,4 +302,12 @@
   error={addError}
   onclose={() => (addOpen = false)}
   onsave={onAddPerson}
+/>
+
+<VialModal
+  open={vialModalOpen}
+  seed={vialModalSeed}
+  knownLidColors={lidColors}
+  onclose={() => (vialModalOpen = false)}
+  onsaved={onVialSaved}
 />
