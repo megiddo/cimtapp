@@ -4,7 +4,7 @@ Source of truth for the branch orchestrator. Product behavior is [v2.md](v2.md).
 
 Stack base is branch **`v2`** (this plan, stacked on `0.3.5-close-vials`). Each next milestone branches from the **tip of the previous milestone**, not from `main`.
 
-**Resume from:** M2
+**Resume from:** M3
 
 Do not launch M0. M0 is this documentation. The parent commits branch `v2` before any worker starts. A worker that finds a dirty tree on its base branch stops with `blocked`.
 
@@ -12,7 +12,7 @@ Do not launch M0. M0 is this documentation. The parent commits branch `v2` befor
 | --- | --- | --- | --- | --- | --- |
 | M0 | Plan and orchestrator docs | `v2` | `0.3.5-close-vials` | unchanged `v0.3.5` | [x] |
 | M1 | Log-book API and v8 migration | `v2.1-log-api` | `v2` | `v2.1.0` | [x] |
-| M2 | Log screen | `v2.2-log-ui` | `v2.1-log-api` | `v2.2.0` | [ ] |
+| M2 | Log screen | `v2.2-log-ui` | `v2.1-log-api` | `v2.2.0` | [x] |
 | M3 | Vial modal and inventory | `v2.3-vial` | `v2.2-log-ui` | `v2.3.0` | [ ] |
 | M4 | Settings | `v2.4-settings` | `v2.3-vial` | `v2.4.0` | [ ] |
 | M5 | Remove v0.3 stock routes | `v2.5-cleanup` | `v2.4-settings` | `v2.5.0` | [ ] |
@@ -171,12 +171,12 @@ Open `/` signed in (or the project's existing test session). Confirm a prefilled
 
 ### Done when
 
-- [ ] `/` is the log form and the recent list; `/log/{id}` edits and deletes
-- [ ] Prefill and save rules covered in `frontend/src/lib`
-- [ ] Tabs are Log, Inventory, Settings
-- [ ] Browser check recorded, including anything that could not be opened
-- [ ] `composer test` and `npm test` pass; `APP_VERSION` is `v2.2.0`
-- [ ] Record appended
+- [x] `/` is the log form and the recent list; `/log/{id}` edits and deletes
+- [x] Prefill and save rules covered in `frontend/src/lib`
+- [x] Tabs are Log, Inventory, Settings
+- [x] Browser check recorded, including anything that could not be opened
+- [x] `composer test` and `npm test` pass; `APP_VERSION` is `v2.2.0`
+- [x] Record appended
 
 ## M3 — Vial modal and inventory
 

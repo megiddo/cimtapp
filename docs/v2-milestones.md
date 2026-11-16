@@ -39,3 +39,15 @@ Do not rewrite an earlier record. The next milestone adds a new section under th
 - Infection / Stryker: not required for v2 orchestrator (optional)
 - Log-tested branches: `logbook.migration.applied`, `logbook.vial.created`, `logbook.entry.saved`, `logbook.entry.rejected`, `logbook.entry.deleted`
 - Browser: not a UI milestone
+
+## M2 — v2.2-log-ui
+
+- Branch: `v2.2-log-ui`
+- Commit: (pending commit)
+- Version: `v2.2.0`
+- What changed: Log at `/` with person chips, defaults, save, recent list, and `/log/{id}` edit; three-tab chrome; v2 API repositories.
+- PHPUnit line: not re-run (no backend edits)
+- Vitest line: passes 90% floor (`npm test`)
+- Infection / Stryker: not run
+- Log-tested branches: M1 lines unchanged
+- Browser: not exercised in agent session

@@ -30,14 +30,14 @@ describe('chrome layout tokens', () => {
 });
 
 describe('NAV_TABS', () => {
-  it('lists four tabs with Log emphasized in the center', () => {
-    expect(NAV_TABS.map((tab) => tab.id)).toEqual(['home', 'log', 'inventory', 'history']);
-    expect(NAV_TABS.map((tab) => tab.href)).toEqual(['/', '/use/new', '/inventory', '/history']);
-    expect(NAV_TABS.map((tab) => tab.label)).toEqual(['Home', 'Log', 'Inventory', 'History']);
+  it('lists three tabs with Log emphasized at home', () => {
+    expect(NAV_TABS.map((tab) => tab.id)).toEqual(['log', 'inventory', 'settings']);
+    expect(NAV_TABS.map((tab) => tab.href)).toEqual(['/', '/inventory', '/settings']);
+    expect(NAV_TABS.map((tab) => tab.label)).toEqual(['Log', 'Inventory', 'Settings']);
     expect(NAV_TABS.filter((tab) => tab.emphasized)).toEqual([
-      { id: 'log', href: '/use/new', label: 'Log', emphasized: true }
+      { id: 'log', href: '/', label: 'Log', emphasized: true }
     ]);
-    expect(NAV_TABS[1]).toEqual(emphasizedTab());
+    expect(NAV_TABS[0]).toEqual(emphasizedTab());
     expect(() => emphasizedTabFrom([])).toThrow('No emphasized tab configured');
     expect(() =>
       emphasizedTabFrom([{ id: 'home', href: '/', label: 'Home', emphasized: false }])
@@ -59,19 +59,17 @@ describe('showsTabBar', () => {
 });
 
 describe('showsSettingsLink', () => {
-  it('is only on Home', () => {
-    expect(showsSettingsLink('/')).toBe(true);
+  it('is hidden because Settings is a tab', () => {
+    expect(showsSettingsLink('/')).toBe(false);
     expect(showsSettingsLink('/settings')).toBe(false);
-    expect(showsSettingsLink('/inventory')).toBe(false);
-    expect(showsSettingsLink('/login')).toBe(false);
   });
 });
 
 describe('isTabActive', () => {
-  it('matches Home only at the root', () => {
+  it('matches Log at / and /log edits', () => {
     expect(isTabActive('/', '/')).toBe(true);
+    expect(isTabActive('/log/abc', '/')).toBe(true);
     expect(isTabActive('/inventory', '/')).toBe(false);
-    expect(isTabActive('/history', '/')).toBe(false);
   });
 
   it('matches nested paths for non-home tabs', () => {
@@ -91,7 +89,8 @@ describe('isTabActive', () => {
 
 describe('titleForPath', () => {
   it('returns the chrome title for known routes', () => {
-    expect(titleForPath('/')).toBe('Home');
+    expect(titleForPath('/')).toBe('Log');
+    expect(titleForPath('/log/abc')).toBe('Edit log');
     expect(titleForPath('/use/new')).toBe('Log');
     expect(titleForPath('/use/123')).toBe('Log');
     expect(titleForPath('/inventory')).toBe('Inventory');
@@ -168,7 +167,8 @@ describe('needsStickyCta', () => {
     expect(needsStickyCta('/inventory/abc')).toBe(true);
     expect(needsStickyCta('/history/abc')).toBe(true);
     expect(needsStickyCta('/history')).toBe(false);
-    expect(needsStickyCta('/')).toBe(false);
+    expect(needsStickyCta('/')).toBe(true);
+    expect(needsStickyCta('/log/abc')).toBe(true);
     expect(needsStickyCta('/prefix/inventory/water/abc')).toBe(false);
     expect(needsStickyCta('/inventory/water/abc/extra')).toBe(false);
     expect(needsStickyCta('/prefix/inventory/syringes/abc')).toBe(false);

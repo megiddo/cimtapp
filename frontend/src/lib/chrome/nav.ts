@@ -1,4 +1,4 @@
-export type TabId = 'home' | 'log' | 'inventory' | 'history';
+export type TabId = 'log' | 'inventory' | 'settings';
 
 export type NavTab = {
   id: TabId;
@@ -8,23 +8,22 @@ export type NavTab = {
 };
 
 export const NAV_TABS: readonly NavTab[] = [
-  { id: 'home', href: '/', label: 'Home', emphasized: false },
-  { id: 'log', href: '/use/new', label: 'Log', emphasized: true },
+  { id: 'log', href: '/', label: 'Log', emphasized: true },
   { id: 'inventory', href: '/inventory', label: 'Inventory', emphasized: false },
-  { id: 'history', href: '/history', label: 'History', emphasized: false }
+  { id: 'settings', href: '/settings', label: 'Settings', emphasized: false }
 ];
 
 export function showsTabBar(pathname: string): boolean {
   return pathname !== '/login' && !pathname.startsWith('/login/');
 }
 
-export function showsSettingsLink(pathname: string): boolean {
-  return pathname === '/';
+export function showsSettingsLink(_pathname: string): boolean {
+  return false;
 }
 
 export function isTabActive(pathname: string, href: string): boolean {
   if (href === '/') {
-    return pathname === '/';
+    return pathname === '/' || pathname.startsWith('/log/');
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);

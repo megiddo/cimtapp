@@ -15,7 +15,8 @@ const FULL_LIST_POLICIES: RoutePolicy[] = INVENTORY_FULL_LIST_ROUTES.map((route)
 }));
 
 export const ROUTE_POLICIES: readonly RoutePolicy[] = [
-  { test: (pathname) => pathname === '/', title: 'Home', backHref: null, stickyCta: false },
+  { test: (pathname) => pathname === '/', title: 'Log', backHref: null, stickyCta: true },
+  { test: (pathname) => /^\/log\/[^/]+$/.test(pathname), title: 'Edit log', backHref: '/', stickyCta: true },
   { test: (pathname) => pathname === '/use/new', title: 'Log', backHref: null, stickyCta: true },
   { test: (pathname) => pathname.startsWith('/use/'), title: 'Log', backHref: null, stickyCta: false },
   { test: (pathname) => pathname === '/inventory/new', title: 'Add', backHref: '/inventory', stickyCta: true },
