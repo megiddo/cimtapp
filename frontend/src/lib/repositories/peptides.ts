@@ -7,6 +7,11 @@ export async function fetchPeptides(baseUrl = ''): Promise<Peptide[]> {
   return Array.isArray(payload.data) ? payload.data : [];
 }
 
+export async function removePeptide(id: string, baseUrl = ''): Promise<DomainResult<Peptide>> {
+  const payload = await readAction<Peptide>(`/api/v1/peptides/${id}/remove`, { baseUrl, method: 'POST' });
+  return asResult(payload, 'Unable to remove peptide.');
+}
+
 export async function createPeptide(body: { name: string }, baseUrl = ''): Promise<DomainResult<Peptide>> {
   const payload = await readAction<Peptide>('/api/v1/peptides', {
     baseUrl,

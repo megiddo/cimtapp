@@ -35,6 +35,14 @@ final class PersonService
         return $this->repository->listVisible($pdo);
     }
 
+  /**
+   * @return list<array<string, mixed>>
+   */
+    public function listRemoved(PDO $pdo): array
+    {
+        return $this->repository->listRemoved($pdo);
+    }
+
     public function create(PDO $pdo, FieldParser $fields): array
     {
         $name = $fields->requireString('name');

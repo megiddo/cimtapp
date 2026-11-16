@@ -36,6 +36,7 @@ use App\Application\Actions\LogBook\Log\PatchLogAction;
 use App\Application\Actions\LogBook\Log\ViewLogAction;
 use App\Application\Actions\LogBook\People\CreatePersonAction;
 use App\Application\Actions\LogBook\People\ListPeopleAction;
+use App\Application\Actions\LogBook\People\ListRemovedPeopleAction;
 use App\Application\Actions\LogBook\People\PatchPersonAction;
 use App\Application\Actions\LogBook\People\RemovePersonAction;
 use App\Application\Actions\LogBook\People\RestorePersonAction;
@@ -123,6 +124,7 @@ return function (App $app): void {
             $authed->patch('/uses/{id}', PatchUseAction::class);
             $authed->delete('/uses/{id}', DeleteUseAction::class);
             $authed->get('/people', ListPeopleAction::class);
+            $authed->get('/people/removed', ListRemovedPeopleAction::class);
             $authed->post('/people', CreatePersonAction::class);
             $authed->patch('/people/{id}', PatchPersonAction::class);
             $authed->post('/people/{id}/remove', RemovePersonAction::class);
