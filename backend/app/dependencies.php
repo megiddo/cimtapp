@@ -29,6 +29,13 @@ use App\Domain\Dose\ProfileService;
 use App\Domain\Dose\UserPeptideService;
 use App\Domain\Dose\SyringeService;
 use App\Domain\Dose\UseService;
+use App\Domain\LogBook\AccountSyringeService;
+use App\Domain\LogBook\LogEntryService;
+use App\Domain\LogBook\LogPeptideService;
+use App\Domain\LogBook\PersonService;
+use App\Domain\LogBook\VialAssignmentService;
+use App\Domain\LogBook\VialNamer;
+use App\Domain\LogBook\VialService;
 use App\Infrastructure\Http\SessionCookie;
 use App\Infrastructure\OAuth\LeagueGoogleOAuthClient;
 use App\Infrastructure\Persistence\DataPaths;
@@ -79,7 +86,9 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(SqliteFileMigrator::class),
             );
         },
-        UserSchemaCatalog::class => static fn (): UserSchemaCatalog => UserSchemaCatalog::default(),
+        UserSchemaCatalog::class => static function (ContainerInterface $c): UserSchemaCatalog {
+            return UserSchemaCatalog::default(null, $c->get(LoggerInterface::class));
+        },
         UserMigrator::class => static function (ContainerInterface $c): UserMigrator {
             return new UserMigrator($c->get(UserSchemaCatalog::class));
         },
@@ -149,6 +158,59 @@ return function (ContainerBuilder $containerBuilder): void {
                 $c->get(ProfileService::class),
                 $c->get(IdGenerator::class),
                 $c->get(Clock::class),
+            );
+        },
+        VialNamer::class => static fn (): VialNamer => new VialNamer(),
+        VialAssignmentService::class => static function (ContainerInterface $c): VialAssignmentService {
+            return new VialAssignmentService(
+                new \App\Domain\LogBook\VialRepository(),
+                new \App\Domain\LogBook\VialPeopleRepository(),
+                $c->get(VialNamer::class),
+                $c->get(Clock::class),
+            );
+        },
+        PersonService::class => static function (ContainerInterface $c): PersonService {
+            return new PersonService(
+                $c->get(VialAssignmentService::class),
+                $c->get(IdGenerator::class),
+                $c->get(Clock::class),
+            );
+        },
+        LogPeptideService::class => static function (ContainerInterface $c): LogPeptideService {
+            return new LogPeptideService(
+                new \App\Domain\LogBook\LogPeptideRepository(),
+                $c->get(IdGenerator::class),
+            );
+        },
+        AccountSyringeService::class => static fn (): AccountSyringeService => new AccountSyringeService(
+            new \App\Domain\LogBook\AccountSyringeRepository(),
+        ),
+        VialService::class => static function (ContainerInterface $c): VialService {
+            return new VialService(
+                new \App\Domain\LogBook\VialRepository(),
+                new \App\Domain\LogBook\VialPeopleRepository(),
+                $c->get(VialAssignmentService::class),
+                new \App\Domain\LogBook\LidColorRepository(),
+                $c->get(LogPeptideService::class),
+                new \App\Domain\LogBook\PersonRepository(),
+                $c->get(DoseCalculator::class),
+                $c->get(VialNamer::class),
+                $c->get(IdGenerator::class),
+                $c->get(Clock::class),
+                $c->get(LoggerInterface::class),
+            );
+        },
+        LogEntryService::class => static function (ContainerInterface $c): LogEntryService {
+            return new LogEntryService(
+                new \App\Domain\LogBook\LogEntryRepository(),
+                $c->get(PersonService::class),
+                $c->get(VialService::class),
+                new \App\Domain\LogBook\VialRepository(),
+                new \App\Domain\LogBook\AccountSyringeRepository(),
+                $c->get(DoseCalculator::class),
+                $c->get(IdGenerator::class),
+                $c->get(Clock::class),
+                $c->get(LoggerInterface::class),
             );
         },
         PasswordHasher::class => static function (ContainerInterface $c): PasswordHasher {

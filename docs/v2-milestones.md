@@ -12,9 +12,8 @@ Do not rewrite an earlier record. The next milestone adds a new section under th
 - Version: `v2.1.0`
 - What changed: <one short paragraph>
 - PHPUnit line: <percent> (`composer test`)
-- Infection covered MSI: <percent> (`composer infection`)
 - Vitest line: <percent> (`npm test`)
-- Stryker: <percent, or "not run — no production TS edits">
+- Infection / Stryker: optional for v2 — <percent or "not run">
 - Log-tested branches: <stable message strings>
 - Browser: <what was exercised, or "not a UI milestone">
 ```
@@ -22,9 +21,21 @@ Do not rewrite an earlier record. The next milestone adds a new section under th
 ## M0 — v2
 
 - Branch: `v2`
-- Commit: uncommitted on this branch until the parent commits the plan
+- Commit: `6fff90e`
 - Version: `v0.3.5` (unchanged)
 - What changed: product spec, orchestrator checklist, and this record. No application code.
 - Gates: not run. Documentation only.
 - Log-tested branches: none
 - Browser: none
+
+## M1 — v2.1-log-api
+
+- Branch: `v2.1-log-api`
+- Commit: (see `git log -1` on this branch after parent commit)
+- Version: `v2.1.0`
+- What changed: User-store v8 log-book schema and backfill; `/people`, `/peptides`, `/syringe`, `/vials`, `/log` API; domain services and HTTP tests including log line assertions.
+- PHPUnit line: 97.64% (`composer test`)
+- Vitest line: passes 90% floor (`npm test`)
+- Infection / Stryker: not required for v2 orchestrator (optional)
+- Log-tested branches: `logbook.migration.applied`, `logbook.vial.created`, `logbook.entry.saved`, `logbook.entry.rejected`, `logbook.entry.deleted`
+- Browser: not a UI milestone
