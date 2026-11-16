@@ -44,7 +44,7 @@ describe('session gating', () => {
     });
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/me', { credentials: 'include' });
 
-    const me = { email: 'a@b.c', has_password: true, has_google: false, remainder: null };
+    const me = { email: 'a@b.c', has_password: true, has_google: false };
     await expect(
       probeSession(
         vi.fn().mockResolvedValue({
@@ -57,7 +57,7 @@ describe('session gating', () => {
   });
 
   it('returns me when GET /me succeeds', async () => {
-    const me = { email: 'a@b.c', has_password: true, has_google: false, remainder: null };
+    const me = { email: 'a@b.c', has_password: true, has_google: false };
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,

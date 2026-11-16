@@ -2,8 +2,6 @@ export type Me = {
   email: string;
   has_password: boolean;
   has_google: boolean;
-  remainder: null | unknown;
-  open_vials?: unknown[];
 };
 
 export function normalizeEmail(email: string): string {

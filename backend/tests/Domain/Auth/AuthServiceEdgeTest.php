@@ -48,7 +48,8 @@ class AuthServiceEdgeTest extends TestCase
         $this->assertSame('a@b.c', $me['email']);
         $this->assertTrue($me['has_password']);
         $this->assertFalse($me['has_google']);
-        $this->assertNull($me['remainder']);
+        $this->assertArrayNotHasKey('remainder', $me);
+        $this->assertArrayNotHasKey('open_vials', $me);
     }
 
     public function testGoogleIncompleteProfileFails(): void

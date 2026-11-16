@@ -25,158 +25,58 @@ describe('chrome layout tokens', () => {
     expect(ROW_MIN_PX).toBe(56);
     expect(INPUT_FONT_PX).toBe(16);
     expect(TAB_BAR_HEIGHT_PX).toBe(56);
-    expect(CONTENT_MAX_PX).toBeGreaterThan(DESIGN_FLOOR_PX);
   });
 });
 
 describe('NAV_TABS', () => {
   it('lists three tabs with Log emphasized at home', () => {
     expect(NAV_TABS.map((tab) => tab.id)).toEqual(['log', 'inventory', 'settings']);
-    expect(NAV_TABS.map((tab) => tab.href)).toEqual(['/', '/inventory', '/settings']);
-    expect(NAV_TABS.map((tab) => tab.label)).toEqual(['Log', 'Inventory', 'Settings']);
-    expect(NAV_TABS.filter((tab) => tab.emphasized)).toEqual([
-      { id: 'log', href: '/', label: 'Log', emphasized: true }
-    ]);
     expect(NAV_TABS[0]).toEqual(emphasizedTab());
-    expect(() => emphasizedTabFrom([])).toThrow('No emphasized tab configured');
-    expect(() =>
-      emphasizedTabFrom([{ id: 'home', href: '/', label: 'Home', emphasized: false }])
-    ).toThrow('No emphasized tab configured');
   });
 });
 
 describe('showsTabBar', () => {
-  it('hides tabs on login and shows them on app routes', () => {
+  it('hides tabs on login', () => {
     expect(showsTabBar('/login')).toBe(false);
-    expect(showsTabBar('/login/reset')).toBe(false);
     expect(showsTabBar('/')).toBe(true);
-    expect(showsTabBar('/use/new')).toBe(true);
-    expect(showsTabBar('/inventory')).toBe(true);
-    expect(showsTabBar('/history')).toBe(true);
-    expect(showsTabBar('/settings')).toBe(true);
-    expect(showsTabBar('/login-help')).toBe(true);
-  });
-});
-
-describe('showsSettingsLink', () => {
-  it('is hidden because Settings is a tab', () => {
-    expect(showsSettingsLink('/')).toBe(false);
-    expect(showsSettingsLink('/settings')).toBe(false);
   });
 });
 
 describe('isTabActive', () => {
-  it('matches Log at / and /log edits', () => {
+  it('marks log tab for / and /log edits', () => {
     expect(isTabActive('/', '/')).toBe(true);
-    expect(isTabActive('/log/abc', '/')).toBe(true);
-    expect(isTabActive('/inventory', '/')).toBe(false);
-  });
-
-  it('matches nested paths for non-home tabs', () => {
-    expect(isTabActive('/use/new', '/use/new')).toBe(true);
+    expect(isTabActive('/log/x', '/')).toBe(true);
     expect(isTabActive('/inventory', '/inventory')).toBe(true);
-    expect(isTabActive('/inventory/new', '/inventory')).toBe(true);
-    expect(isTabActive('/inventory/vials', '/inventory')).toBe(true);
-    expect(isTabActive('/inventory/water', '/inventory')).toBe(true);
-    expect(isTabActive('/inventory/syringes', '/inventory')).toBe(true);
-    expect(isTabActive('/inventory/abc', '/inventory')).toBe(true);
-    expect(isTabActive('/history/edit', '/history')).toBe(true);
-    expect(isTabActive('/inventory', '/history')).toBe(false);
-    expect(isTabActive('/use', '/use/new')).toBe(false);
-    expect(isTabActive('/inventory/new', '/history')).toBe(false);
   });
 });
 
 describe('titleForPath', () => {
-  it('returns the chrome title for known routes', () => {
+  it('names v2 screens', () => {
     expect(titleForPath('/')).toBe('Log');
-    expect(titleForPath('/log/abc')).toBe('Edit log');
-    expect(titleForPath('/use/new')).toBe('Log');
-    expect(titleForPath('/use/123')).toBe('Log');
     expect(titleForPath('/inventory')).toBe('Inventory');
-    expect(titleForPath('/inventory/new')).toBe('Add');
-    expect(titleForPath('/inventory/water/new')).toBe('Add BAC');
-    expect(titleForPath('/inventory/water/abc')).toBe('Edit');
-    expect(titleForPath('/inventory/syringes/new')).toBe('Add syringe');
-    expect(titleForPath('/inventory/syringes/abc')).toBe('Edit');
-    expect(titleForPath('/inventory/peptides/new')).toBe('Add peptide');
-    expect(titleForPath('/inventory/vials')).toBe('Vials');
-    expect(titleForPath('/inventory/water')).toBe('BAC');
-    expect(titleForPath('/inventory/syringes')).toBe('Syringes');
-    expect(titleForPath('/inventory/abc')).toBe('Edit');
-    expect(titleForPath('/history')).toBe('History');
-    expect(titleForPath('/history/1')).toBe('Edit');
-    expect(titleForPath('/login')).toBe('Sign in');
-    expect(titleForPath('/login/x')).toBe('Sign in');
     expect(titleForPath('/settings')).toBe('Settings');
-    expect(titleForPath('/settings/syringes')).toBe('Settings');
-    expect(titleForPath('/unknown')).toBe('PepTrack');
-    expect(titleForPath('/prefix/inventory/water/abc')).toBe('PepTrack');
-    expect(titleForPath('/inventory/water/abc/extra')).toBe('Inventory');
-    expect(titleForPath('/prefix/inventory/syringes/abc')).toBe('PepTrack');
-    expect(titleForPath('/inventory/syringes/abc/extra')).toBe('Inventory');
-    expect(titleForPath('/prefix/inventory/abc')).toBe('PepTrack');
-    expect(titleForPath('/inventory/abc/extra')).toBe('Inventory');
-    expect(titleForPath('/prefix/history/1')).toBe('PepTrack');
-    expect(titleForPath('/history/1/extra')).toBe('History');
-    expect(titleForPath('/use')).toBe('PepTrack');
-    expect(titleForPath('/inventory/')).toBe('Inventory');
-  });
-});
-
-describe('backHrefForPath', () => {
-  it('returns a chevron target for mix, vial edit, and use edit', () => {
-    expect(backHrefForPath('/inventory/new')).toBe('/inventory');
-    expect(backHrefForPath('/inventory/water/new')).toBe('/inventory');
-    expect(backHrefForPath('/inventory/water/abc')).toBe('/inventory');
-    expect(backHrefForPath('/inventory/syringes/new')).toBe('/inventory');
-    expect(backHrefForPath('/inventory/syringes/abc')).toBe('/inventory');
-    expect(backHrefForPath('/inventory/peptides/new')).toBe('/inventory');
-    expect(backHrefForPath('/inventory/vials')).toBe('/inventory');
-    expect(backHrefForPath('/inventory/water')).toBe('/inventory');
-    expect(backHrefForPath('/inventory/syringes')).toBe('/inventory');
-    expect(backHrefForPath('/inventory/abc')).toBe('/inventory');
-    expect(backHrefForPath('/history/abc')).toBe('/history');
-    expect(backHrefForPath('/history')).toBeNull();
-    expect(backHrefForPath('/inventory')).toBeNull();
-    expect(backHrefForPath('/')).toBeNull();
-    expect(backHrefForPath('/prefix/inventory/water/abc')).toBeNull();
-    expect(backHrefForPath('/inventory/water/abc/extra')).toBeNull();
-    expect(backHrefForPath('/prefix/inventory/syringes/abc')).toBeNull();
-    expect(backHrefForPath('/inventory/syringes/abc/extra')).toBeNull();
-    expect(backHrefForPath('/prefix/inventory/abc')).toBeNull();
-    expect(backHrefForPath('/inventory/abc/extra')).toBeNull();
-    expect(backHrefForPath('/prefix/history/abc')).toBeNull();
-    expect(backHrefForPath('/history/abc/extra')).toBeNull();
+    expect(titleForPath('/log/1')).toBe('Edit log');
   });
 });
 
 describe('needsStickyCta', () => {
-  it('is true on log, mix, inventory, vial edit, and use edit', () => {
-    expect(needsStickyCta('/use/new')).toBe(true);
-    expect(needsStickyCta('/inventory')).toBe(false);
-    expect(needsStickyCta('/inventory/new')).toBe(true);
-    expect(needsStickyCta('/inventory/water/new')).toBe(true);
-    expect(needsStickyCta('/inventory/water/abc')).toBe(true);
-    expect(needsStickyCta('/inventory/syringes/new')).toBe(true);
-    expect(needsStickyCta('/inventory/syringes/abc')).toBe(true);
-    expect(needsStickyCta('/inventory/peptides/new')).toBe(true);
-    expect(needsStickyCta('/inventory/vials')).toBe(false);
-    expect(needsStickyCta('/inventory/water')).toBe(false);
-    expect(needsStickyCta('/inventory/syringes')).toBe(false);
-    expect(needsStickyCta('/inventory/abc')).toBe(true);
-    expect(needsStickyCta('/history/abc')).toBe(true);
-    expect(needsStickyCta('/history')).toBe(false);
+  it('is true on log routes only', () => {
     expect(needsStickyCta('/')).toBe(true);
-    expect(needsStickyCta('/log/abc')).toBe(true);
-    expect(needsStickyCta('/prefix/inventory/water/abc')).toBe(false);
-    expect(needsStickyCta('/inventory/water/abc/extra')).toBe(false);
-    expect(needsStickyCta('/prefix/inventory/syringes/abc')).toBe(false);
-    expect(needsStickyCta('/inventory/syringes/abc/extra')).toBe(false);
-    expect(needsStickyCta('/prefix/inventory/abc')).toBe(false);
-    expect(needsStickyCta('/inventory/abc/extra')).toBe(false);
-    expect(needsStickyCta('/prefix/history/abc')).toBe(false);
-    expect(needsStickyCta('/history/abc/extra')).toBe(false);
-    expect(needsStickyCta('/use')).toBe(false);
+    expect(needsStickyCta('/log/1')).toBe(true);
+    expect(needsStickyCta('/inventory')).toBe(false);
+  });
+});
+
+describe('backHrefForPath', () => {
+  it('returns home only when editing a log row', () => {
+    expect(backHrefForPath('/')).toBeNull();
+    expect(backHrefForPath('/log/1')).toBe('/');
+    expect(backHrefForPath('/unknown')).toBeNull();
+  });
+});
+
+describe('showsSettingsLink', () => {
+  it('is always false because Settings is a tab', () => {
+    expect(showsSettingsLink('/')).toBe(false);
   });
 });

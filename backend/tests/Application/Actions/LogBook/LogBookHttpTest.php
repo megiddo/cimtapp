@@ -34,7 +34,7 @@ class LogBookHttpTest extends TestCase
     public function testCreateEndpointsReturn201(): void
     {
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $this->assertSame(201, $this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid)->getStatusCode());
         $person = $this->json($this->authed($app, 'GET', '/api/v1/people', $sid))['data'][0];
         $this->assertSame(
@@ -66,7 +66,7 @@ class LogBookHttpTest extends TestCase
     public function testFreshAccountPeoplePeptidesAndSyringe(): void
     {
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
 
         $people = $this->json($this->authed($app, 'GET', '/api/v1/people', $sid))['data'];
         $this->assertSame([], $people);
@@ -86,7 +86,7 @@ class LogBookHttpTest extends TestCase
     public function testCreateVialDerivedNamesAndReplace(): void
     {
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $noah = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid))['data'];
         $sam = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Sam'], $sid))['data'];
 
@@ -125,7 +125,7 @@ class LogBookHttpTest extends TestCase
     public function testLogSnapshotAndSyringeImmutability(): void
     {
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $noah = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid))['data'];
         $vial = $this->json($this->authedJson($app, 'POST', '/api/v1/vials', [
             'peptide_id' => 'tirzepatide',
@@ -156,7 +156,7 @@ class LogBookHttpTest extends TestCase
     public function testCrossPersonDrawAndOverdraw(): void
     {
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $noah = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid))['data'];
         $sam = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Sam'], $sid))['data'];
         $samVial = $this->json($this->authedJson($app, 'POST', '/api/v1/vials', [
@@ -185,7 +185,7 @@ class LogBookHttpTest extends TestCase
     public function testLogValidationAndLastDraw(): void
     {
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $person = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid))['data'];
         $vial = $this->json($this->authedJson($app, 'POST', '/api/v1/vials', [
             'peptide_id' => 'tirzepatide',
@@ -237,7 +237,7 @@ class LogBookHttpTest extends TestCase
     {
         $this->clock = \Tests\Support\FrozenClock::at('2026-11-16T10:18:00Z');
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $person = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid))['data'];
         $emptyDefaults = $this->json($this->authed(
             $app,
@@ -288,7 +288,7 @@ class LogBookHttpTest extends TestCase
     public function testSupersededVialRejectedOnLog(): void
     {
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $person = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid))['data'];
         $old = $this->json($this->authedJson($app, 'POST', '/api/v1/vials', [
             'peptide_id' => 'tirzepatide',
@@ -321,7 +321,7 @@ class LogBookHttpTest extends TestCase
     public function testPatchPersonPeptideAndSyringeValidation(): void
     {
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $person = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid))['data'];
         $renamed = $this->json($this->authedJson($app, 'PATCH', '/api/v1/people/' . $person['id'], [
             'name' => 'Nate',
@@ -340,7 +340,7 @@ class LogBookHttpTest extends TestCase
     public function testViewPatchAndListLog(): void
     {
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $person = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid))['data'];
         $vial = $this->json($this->authedJson($app, 'POST', '/api/v1/vials', [
             'peptide_id' => 'tirzepatide',
@@ -381,7 +381,7 @@ class LogBookHttpTest extends TestCase
     public function testRestorePersonWhenNameIsFree(): void
     {
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $person = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid))['data'];
         $this->authedJson($app, 'POST', '/api/v1/people/' . $person['id'] . '/remove', [], $sid);
         $this->json($this->authedJson($app, 'POST', '/api/v1/people/' . $person['id'] . '/restore', [], $sid));
@@ -391,7 +391,7 @@ class LogBookHttpTest extends TestCase
     public function testPeopleDuplicateRemoveRestore(): void
     {
         $app = $this->getAppInstance();
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $a = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid))['data'];
         $dup = $this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'noah'], $sid);
         $this->assertSame(422, $dup->getStatusCode());
@@ -420,7 +420,7 @@ class LogBookHttpTest extends TestCase
             $logger->pushHandler($handler);
             $builder->addDefinitions([LoggerInterface::class => static fn (): LoggerInterface => $logger]);
         });
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $this->authed($app, 'GET', '/api/v1/people', $sid);
         $this->assertTrue($handler->hasInfoThatContains('logbook.migration.applied'));
     }
@@ -526,40 +526,27 @@ class LogBookHttpTest extends TestCase
             $logger->pushHandler($handler);
             $builder->addDefinitions([LoggerInterface::class => static fn (): LoggerInterface => $logger]);
         });
-        $sid = $this->register($app, false);
+        $sid = $this->register($app);
         $person = $this->json($this->authedJson($app, 'POST', '/api/v1/people', ['name' => 'Noah'], $sid))['data'];
 
         return [$app, $handler, $sid, $person];
     }
 
-    private function register(\Slim\App $app, bool $restockSyringes = true): string
+    protected function register(\Slim\App $app): string
     {
         $response = $app->handle($this->createJsonRequest('POST', '/api/v1/auth/register', [
             'email' => bin2hex(random_bytes(4)) . '@logbook.test',
             'password' => 'twelvechars!!',
         ]));
         $this->assertSame(201, $response->getStatusCode());
-        $sid = $this->sessionIdFrom($response);
-        if ($restockSyringes) {
-            $id = $this->json($this->authed($app, 'GET', '/api/v1/syringes', $sid))['data'][0]['id'];
-            $this->authedJson($app, 'POST', '/api/v1/syringes/' . $id . '/restock', ['count' => 50], $sid);
-        }
 
-        return $sid;
-    }
-
-    private function ensureBac(\Slim\App $app, string $sid, float $neededMl): void
-    {
-        $this->authedJson($app, 'POST', '/api/v1/bac-bottles', [
-            'volume_ml' => max(30.0, $neededMl),
-            'opened_at' => '2026-08-01T00:00',
-        ], $sid);
+        return $this->sessionIdFrom($response);
     }
 
     /**
      * @param array<string, mixed> $body
      */
-    private function authedJson(
+    protected function authedJson(
         \Slim\App $app,
         string $method,
         string $path,
@@ -574,7 +561,7 @@ class LogBookHttpTest extends TestCase
         ));
     }
 
-    private function authed(
+    protected function authed(
         \Slim\App $app,
         string $method,
         string $path,

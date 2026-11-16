@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prefillRecompound, prefillRecalculate } from './vialModalPrefill';
+import { prefillNew, prefillRecompound, prefillRecalculate } from './vialModalPrefill';
 import type { LogEntry, VialSummary } from './types';
 
 const vial: VialSummary = {
@@ -38,6 +38,13 @@ const latest: LogEntry = {
 };
 
 describe('vialModalPrefill', () => {
+  it('seeds a new modal from selected people', () => {
+    const seed = prefillNew(['p1'], 'retatrutide');
+    expect(seed.person_ids).toEqual(['p1']);
+    expect(seed.peptide_id).toBe('retatrutide');
+    expect(seed.peptide_mg).toBe('10');
+  });
+
   it('recompound copies the current vial mix', () => {
     const seed = prefillRecompound(vial);
     expect(seed.peptide_mg).toBe('10');

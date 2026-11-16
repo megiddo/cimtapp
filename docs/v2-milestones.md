@@ -51,3 +51,39 @@ Do not rewrite an earlier record. The next milestone adds a new section under th
 - Infection / Stryker: not run
 - Log-tested branches: M1 lines unchanged
 - Browser: not exercised in agent session
+
+## M3 — v2.3-vial
+
+- Branch: `v2.3-vial`
+- Commit: `940edff`
+- Version: `v2.3.0`
+- What changed: inventory page, vial modal with pepcalc, empty-vial banner, vial naming helpers.
+- PHPUnit line: not re-run (no backend edits)
+- Vitest line: passes 90% floor (`npm test`)
+- Infection / Stryker: not run
+- Log-tested branches: M1 lines unchanged
+- Browser: not exercised in agent session
+
+## M4 — v2.4-settings
+
+- Branch: `v2.4-settings`
+- Commit: `f1aff34`
+- Version: `v2.4.0`
+- What changed: settings for people, peptides, account syringe, and account; `GET /people/removed`.
+- PHPUnit line: ~97% (`composer test`)
+- Vitest line: passes 90% floor (`npm test`)
+- Infection / Stryker: not run
+- Log-tested branches: M1 lines unchanged
+- Browser: not exercised in agent session
+
+## M5 — v2.5-cleanup
+
+- Branch: `v2.5-cleanup`
+- Commit: (this commit)
+- Version: `v2.5.0`
+- What changed: removed v0.3 HTTP routes, SPA trees, and stock-only domain/actions; `GET /me` identity-only; v2 guard tests.
+- PHPUnit line: 95.78% (`composer test`)
+- Vitest line: passes 90% floor (`npm test`)
+- Infection / Stryker: optional — capped scripts available; not required for sign-off
+- Log-tested branches: M1 lines unchanged
+- Browser: docker stack `make up` after `make frontend-build`

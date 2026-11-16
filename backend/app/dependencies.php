@@ -20,15 +20,7 @@ use App\Domain\Auth\UserProvisioner;
 use App\Domain\Auth\UserStorePort;
 use App\Domain\Crypto\AmkRotator;
 use App\Domain\Crypto\Crypto;
-use App\Domain\Dose\ArchivePolicy;
-use App\Domain\Dose\BacBottleService;
-use App\Domain\Dose\CompoundService;
 use App\Domain\Dose\DoseCalculator;
-use App\Domain\Dose\PeptideCatalog;
-use App\Domain\Dose\ProfileService;
-use App\Domain\Dose\UserPeptideService;
-use App\Domain\Dose\SyringeService;
-use App\Domain\Dose\UseService;
 use App\Domain\LogBook\AccountSyringeService;
 use App\Domain\LogBook\LogEntryService;
 use App\Domain\LogBook\LogPeptideService;
@@ -111,55 +103,6 @@ return function (ContainerBuilder $containerBuilder): void {
         EmailNormalizer::class => static fn (): EmailNormalizer => new EmailNormalizer(),
         CredentialParser::class => static fn (): CredentialParser => new CredentialParser(),
         DoseCalculator::class => static fn (): DoseCalculator => new DoseCalculator(),
-        ArchivePolicy::class => static function (ContainerInterface $c): ArchivePolicy {
-            return new ArchivePolicy($c->get(DoseCalculator::class));
-        },
-        SyringeService::class => static function (ContainerInterface $c): SyringeService {
-            return new SyringeService($c->get(IdGenerator::class));
-        },
-        BacBottleService::class => static function (ContainerInterface $c): BacBottleService {
-            return new BacBottleService(
-                $c->get(DoseCalculator::class),
-                $c->get(IdGenerator::class),
-                $c->get(Clock::class),
-                $c->get(ArchivePolicy::class),
-            );
-        },
-        UserPeptideService::class => static function (ContainerInterface $c): UserPeptideService {
-            return new UserPeptideService(
-                $c->get(PeptideCatalog::class),
-                $c->get(IdGenerator::class),
-                $c->get(Clock::class),
-            );
-        },
-        ProfileService::class => static function (ContainerInterface $c): ProfileService {
-            return new ProfileService(
-                $c->get(IdGenerator::class),
-                $c->get(Clock::class),
-            );
-        },
-        CompoundService::class => static function (ContainerInterface $c): CompoundService {
-            return new CompoundService(
-                $c->get(DoseCalculator::class),
-                $c->get(UserPeptideService::class),
-                $c->get(SyringeService::class),
-                $c->get(BacBottleService::class),
-                $c->get(ProfileService::class),
-                $c->get(IdGenerator::class),
-                $c->get(Clock::class),
-                $c->get(ArchivePolicy::class),
-            );
-        },
-        UseService::class => static function (ContainerInterface $c): UseService {
-            return new UseService(
-                $c->get(DoseCalculator::class),
-                $c->get(CompoundService::class),
-                $c->get(SyringeService::class),
-                $c->get(ProfileService::class),
-                $c->get(IdGenerator::class),
-                $c->get(Clock::class),
-            );
-        },
         VialNamer::class => static fn (): VialNamer => new VialNamer(),
         VialAssignmentService::class => static function (ContainerInterface $c): VialAssignmentService {
             return new VialAssignmentService(
