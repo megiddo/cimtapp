@@ -31,7 +31,7 @@ Do not rewrite an earlier record. The next milestone adds a new section under th
 ## M1 — v2.1-log-api
 
 - Branch: `v2.1-log-api`
-- Commit: (see `git log -1` on this branch after parent commit)
+- Commit: `35e5501`
 - Version: `v2.1.0`
 - What changed: User-store v8 log-book schema and backfill; `/people`, `/peptides`, `/syringe`, `/vials`, `/log` API; domain services and HTTP tests including log line assertions.
 - PHPUnit line: 97.64% (`composer test`)

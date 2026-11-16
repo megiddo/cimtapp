@@ -33,10 +33,12 @@ Run the full suite. No `--filter` on sign-off. Do not commit `build/`, `coverage
 
 | Gate | Command | When |
 | --- | --- | --- |
-| Infection | `cd backend && composer infection` | After M5 or locally when you want extra confidence |
-| Stryker | `cd frontend && npm run mutation` | Same |
+| Infection | `cd backend && ./scripts/infection-capped.sh` | After M5 or locally when you want extra confidence |
+| Stryker | `cd frontend && ./scripts/mutation-capped.sh` | Same |
 
-If you run mutation locally and MSI is below 80, note it in the milestone record. It is not a v2 orchestrator failure.
+**Watchdog:** each capped script kills the run after **30 minutes** (`MUTATION_TIME_LIMIT_SEC`, default **1800**). Exit **124** means timed out — record `mutation: watchdog timeout` in the milestone record and treat the milestone as **ok** if PHPUnit and Vitest passed. Do not restart mutation in the same milestone.
+
+If mutation finishes under the cap and MSI is below 80, note it in the record. That is still not a v2 orchestrator failure.
 
 No benchmark gate. No new log database and no `/debug` endpoint. Logging uses the Monolog `LoggerInterface` already registered in `backend/app/dependencies.php`.
 
