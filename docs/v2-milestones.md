@@ -43,7 +43,7 @@ Do not rewrite an earlier record. The next milestone adds a new section under th
 ## M2 — v2.2-log-ui
 
 - Branch: `v2.2-log-ui`
-- Commit: (pending commit)
+- Commit: `2065c64`
 - Version: `v2.2.0`
 - What changed: Log at `/` with person chips, defaults, save, recent list, and `/log/{id}` edit; three-tab chrome; v2 API repositories.
 - PHPUnit line: not re-run (no backend edits)
