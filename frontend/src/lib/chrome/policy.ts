@@ -7,6 +7,7 @@ export type RoutePolicy = {
 
 export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { test: (pathname) => pathname === '/', title: 'Log', backHref: null, stickyCta: true },
+  { test: (pathname) => pathname === '/history', title: 'History', backHref: '/', stickyCta: false },
   { test: (pathname) => /^\/log\/[^/]+$/.test(pathname), title: 'Edit log', backHref: '/', stickyCta: true },
   { test: (pathname) => pathname === '/inventory', title: 'Inventory', backHref: null, stickyCta: false },
   { test: (pathname) => pathname === '/login' || pathname.startsWith('/login/'), title: 'Sign in', backHref: null, stickyCta: false },

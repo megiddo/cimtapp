@@ -27,6 +27,7 @@
   import NameModal from './NameModal.svelte';
   import VialModal from './VialModal.svelte';
   import EmptyVialBanner from './EmptyVialBanner.svelte';
+  import { formatMgLeft } from './remaining';
   import { prefillNew, prefillRecompound, prefillRecalculate, type VialModalPrefill } from './vialModalPrefill';
 
   type Props = {
@@ -92,7 +93,7 @@
     loggedAt = seed.loggedAt;
     sourceLoggedAt = seed.sourceLoggedAt;
     probablyEmpty = defaults.probably_empty;
-    recent = await fetchLogEntries(person, { limit: 20 });
+    recent = await fetchLogEntries(person, { limit: 1 });
   }
 
   async function init() {
@@ -110,7 +111,7 @@
       syringeVolume = row.syringe_volume_ml;
       syringeCapacity = row.syringe_capacity_iu;
       if (personId !== '') {
-        recent = await fetchLogEntries(personId, { limit: 20 });
+        recent = await fetchLogEntries(personId, { limit: 1 });
       }
     } else {
       const start = pickInitialPersonId(people, remembered);
@@ -163,6 +164,7 @@
     );
     pending = false;
     if (outcome.kind === 'ok') {
+      vials = await fetchCurrentVials();
       await goto('/');
       return;
     }
@@ -255,6 +257,9 @@
         {#if selectedVial?.lid_color_name}
           <span class="muted">{selectedVial.lid_color_name}</span>
         {/if}
+        {#if selectedVial !== null}
+          <span class="muted">{formatMgLeft(selectedVial.mg_left)} in this vial</span>
+        {/if}
         {#if firstFieldError(fields, 'vial_id')}
           <span class="field-error">{firstFieldError(fields, 'vial_id')}</span>
         {/if}
@@ -273,7 +278,7 @@
 
       <label class="check">
         <input type="checkbox" bind:checked={isLastDraw} disabled={pending} />
-        Last draw
+        Last draw — vial is empty after this dose
       </label>
 
       {#if sourceCaption}
@@ -289,8 +294,13 @@
       <button type="button" class="secondary danger" disabled={pending} onclick={onDelete}>Delete</button>
     {/if}
 
-    {#if !editing}
-      <LogList rows={recent} editHref={(id) => `/log/${id}`} />
+    {#if !editing && personId !== ''}
+      {#if recent.length > 0}
+        <LogList rows={recent} editHref={(id) => `/log/${id}`} />
+      {/if}
+      <p>
+        <a class="full-list-link" href={`/history?person=${encodeURIComponent(personId)}`}>History</a>
+      </p>
     {/if}
   {/if}
 {/if}

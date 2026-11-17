@@ -43,9 +43,10 @@ describe('showsTabBar', () => {
 });
 
 describe('isTabActive', () => {
-  it('marks log tab for / and /log edits', () => {
+  it('marks log tab for /, /log edits, and history', () => {
     expect(isTabActive('/', '/')).toBe(true);
     expect(isTabActive('/log/x', '/')).toBe(true);
+    expect(isTabActive('/history', '/')).toBe(true);
     expect(isTabActive('/inventory', '/inventory')).toBe(true);
   });
 });
@@ -56,6 +57,7 @@ describe('titleForPath', () => {
     expect(titleForPath('/inventory')).toBe('Inventory');
     expect(titleForPath('/settings')).toBe('Settings');
     expect(titleForPath('/log/1')).toBe('Edit log');
+    expect(titleForPath('/history')).toBe('History');
   });
 });
 
@@ -71,6 +73,7 @@ describe('backHrefForPath', () => {
   it('returns home only when editing a log row', () => {
     expect(backHrefForPath('/')).toBeNull();
     expect(backHrefForPath('/log/1')).toBe('/');
+    expect(backHrefForPath('/history')).toBe('/');
     expect(backHrefForPath('/unknown')).toBeNull();
   });
 });

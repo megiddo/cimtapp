@@ -4,7 +4,7 @@ Source of truth for the branch orchestrator. Product behavior already shipped is
 
 Stack base is branch **`v2.5-cleanup`**. Each next milestone branches from the **tip of the previous milestone**, not from `main`.
 
-**Resume from:** P2 (P1 committed on `v2.6-inventory`)
+**Resume from:** P3 (P2 committed on `v2.7-log`)
 
 Do not launch P0. P0 is this documentation. The parent commits branch `v2.6` (this file at `docs/polish-checklist.md`, plus an empty record file `docs/polish-milestones.md`) before any worker starts. A worker that finds a dirty tree on its base branch stops with `blocked`. Leave untracked `Untitled/` untracked. Do not `git add -A`.
 
@@ -12,7 +12,7 @@ Do not launch P0. P0 is this documentation. The parent commits branch `v2.6` (th
 | --- | --- | --- | --- | --- | --- |
 | P0 | Plan and orchestrator docs | `v2.6` | `v2.5-cleanup` | unchanged `v2.5.0` | [x] |
 | P1 | Inventory names and modal | `v2.6-inventory` | `v2.6` | `v2.6.0` | [x] |
-| P2 | Log screen | `v2.7-log` | `v2.6-inventory` | `v2.7.0` | [ ] |
+| P2 | Log screen | `v2.7-log` | `v2.6-inventory` | `v2.7.0` | [x] |
 | P3 | Settings trim | `v2.8-settings` | `v2.7-log` | `v2.8.0` | [ ] |
 
 Workers follow the development skill and, for PHP, the PHP Slim rule. **These milestones use the same lighter gate as v2.** Repo-wide floors in [TESTING.md](TESTING.md) stay unchanged for `main` and release PRs.
@@ -132,12 +132,12 @@ Select a person, confirm the heading, a prefilled IU with no steppers, the last-
 
 ### Done when
 
-- [ ] Person chips are labeled; IU has no stepper; last draw is labeled
-- [ ] Current vial shows mg left
-- [ ] Log shows one row; History lists the person’s rows
-- [ ] Browser check recorded
-- [ ] `composer test` and `npm test` pass; `APP_VERSION` is `v2.7.0`
-- [ ] Record appended
+- [x] Person chips are labeled; IU has no stepper; last draw is labeled
+- [x] Current vial shows mg left
+- [x] Log shows one row; History lists the person’s rows
+- [x] Browser check recorded
+- [x] `composer test` and `npm test` pass; `APP_VERSION` is `v2.7.0`
+- [x] Record appended
 
 ## P3 — Settings trim
 

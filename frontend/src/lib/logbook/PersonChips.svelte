@@ -12,6 +12,7 @@
   let { people, selectedId, disabled = false, onselect, onadd }: Props = $props();
 </script>
 
+<h2 class="section-label">Person</h2>
 <div class="chip-row">
   {#each people as person (person.id)}
     <button

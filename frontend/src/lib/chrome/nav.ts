@@ -23,7 +23,7 @@ export function showsSettingsLink(_pathname: string): boolean {
 
 export function isTabActive(pathname: string, href: string): boolean {
   if (href === '/') {
-    return pathname === '/' || pathname.startsWith('/log/');
+    return pathname === '/' || pathname.startsWith('/log/') || pathname === '/history';
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
