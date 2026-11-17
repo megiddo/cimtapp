@@ -33,9 +33,21 @@ Do not rewrite an earlier record. Append a new section using:
 ## P2 — v2.7-log
 
 - Branch: `v2.7-log`
-- Commit: `(pending)`
+- Commit: `9fcdd0a`
 - Version: `v2.7.0`
 - What changed: Log UI labels the person row, drops IU steppers, clarifies last-draw copy, shows mg left under the vial, lists one recent row with a History page for the full person list.
+- PHPUnit line: 95.66% (`composer test`)
+- Vitest line: 97.38% (`npm test`)
+- Infection / Stryker: not run
+- Log-tested branches: v2 M1 lines still pass; no new lines
+- Browser: not exercised in agent session
+
+## P3 — v2.8-settings
+
+- Branch: `v2.8-settings`
+- Commit: `b65fde6`
+- Version: `v2.8.0`
+- What changed: Settings keeps people, peptides, export/backup, and logout; password change and syringe editing UI removed while APIs stay for login and dosing.
 - PHPUnit line: 95.66% (`composer test`)
 - Vitest line: 97.38% (`npm test`)
 - Infection / Stryker: not run

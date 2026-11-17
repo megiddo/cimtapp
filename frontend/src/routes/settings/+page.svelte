@@ -4,7 +4,6 @@
   import { onMount } from 'svelte';
   import { logout, type Me } from '$lib/auth';
   import DataSection from '$lib/settings/DataSection.svelte';
-  import PasswordSection from '$lib/settings/PasswordSection.svelte';
   import { APP_VERSION } from '$lib/version';
   import {
     createPerson,
@@ -15,21 +14,16 @@
     restorePerson
   } from '$lib/repositories/people';
   import { createPeptide, fetchPeptides, removePeptide } from '$lib/repositories/peptides';
-  import { fetchAccountSyringe, putAccountSyringe } from '$lib/repositories/syringe';
   import { nameFieldError } from '$lib/settings/fieldError';
-  import { isValidSyringe } from '$lib/settings/syringeForm';
   import NameModal from '$lib/logbook/NameModal.svelte';
   import type { Person, Peptide } from '$lib/logbook/types';
-  import { firstFieldError, type FieldMap } from '$lib/payload';
-  import { runDomainMutation } from '$lib/mutations/runDomainMutation';
+  import type { FieldMap } from '$lib/payload';
 
   const me = $derived((page.data.me ?? null) as Me | null);
 
   let people = $state<Person[]>([]);
   let removedPeople = $state<Person[]>([]);
   let peptides = $state<Peptide[]>([]);
-  let volumeText = $state('0.5');
-  let capacityText = $state('50');
   let loaded = $state(false);
   let fields = $state<FieldMap>({});
   let personModal = $state<'add' | 'rename' | null>(null);
@@ -40,9 +34,6 @@
     people = await fetchPeople();
     removedPeople = await fetchRemovedPeople();
     peptides = await fetchPeptides();
-    const syringe = await fetchAccountSyringe();
-    volumeText = String(syringe.volume_ml);
-    capacityText = String(syringe.capacity_iu);
     loaded = true;
   }
 
@@ -79,27 +70,12 @@
     peptideModal = false;
     await reload();
   }
-
-  async function saveSyringe(event: SubmitEvent) {
-    event.preventDefault();
-    const volume = Number(volumeText);
-    const capacity = Number(capacityText);
-    if (!isValidSyringe(volume, capacity)) {
-      return;
-    }
-    const outcome = await runDomainMutation(() => putAccountSyringe({ volume_ml: volume, capacity_iu: capacity }));
-    if (outcome.kind === 'ok') {
-      fields = {};
-    }
-  }
 </script>
 
 {#if me}
   <section class="settings-block">
     <h2 class="day-heading">Account</h2>
     <p>{me.email}</p>
-    <p class="muted">Changing the syringe affects the next log entry only. Past rows keep their snapshots.</p>
-    <PasswordSection {me} />
     <DataSection />
     <button type="button" class="secondary" onclick={onLogout}>Log out</button>
     <p class="muted app-version">{APP_VERSION}</p>
@@ -145,21 +121,6 @@
       {/each}
     </div>
     <button type="button" class="chip" onclick={() => (peptideModal = true)}>Add peptide</button>
-  </section>
-
-  <section class="settings-block">
-    <h2 class="day-heading">Syringe</h2>
-    <form class="auth-form" onsubmit={saveSyringe}>
-      <label>
-        mL per syringe
-        <input inputmode="decimal" bind:value={volumeText} />
-      </label>
-      <label>
-        IU per syringe
-        <input inputmode="decimal" bind:value={capacityText} />
-      </label>
-      <button type="submit">Save syringe</button>
-    </form>
   </section>
 {/if}
 
