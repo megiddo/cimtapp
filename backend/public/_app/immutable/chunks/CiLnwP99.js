@@ -1,0 +1,1 @@
+import{a as e,p as c}from"./ChnmCsvs.js";async function l(s,n={}){const{baseUrl:o,...r}=n,t=await e(s,{...r,baseUrl:o});let a=null;try{a=await t.json()}catch{a=null}return c(a,t.status)}export{l as r};

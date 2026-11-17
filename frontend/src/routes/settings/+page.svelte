@@ -126,10 +126,18 @@
 
 <NameModal
   title={personModal === 'rename' ? 'Rename person' : 'Add person'}
+  titleId="settings-person-name"
   open={personModal !== null}
   error={nameFieldError(fields)}
   onclose={() => (personModal = null)}
   onsave={savePerson}
 />
 
-<NameModal title="Add peptide" open={peptideModal} error={nameFieldError(fields)} onclose={() => (peptideModal = false)} onsave={savePeptide} />
+<NameModal
+  title="Add peptide"
+  titleId="settings-peptide-name"
+  open={peptideModal}
+  error={nameFieldError(fields)}
+  onclose={() => (peptideModal = false)}
+  onsave={savePeptide}
+/>

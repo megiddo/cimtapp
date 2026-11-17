@@ -18,7 +18,7 @@
     <button
       type="button"
       class="chip"
-      class:selected={person.id === selectedId}
+      class:active={person.id === selectedId}
       {disabled}
       onclick={() => onselect(person.id)}
     >
