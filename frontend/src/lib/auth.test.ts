@@ -31,7 +31,7 @@ describe('auth helpers', () => {
 
   it('rejects me payloads that leak DEK material', () => {
     expect(
-      isMe({ email: 'a@b.c', has_password: true, has_google: false, remainder: null })
+      isMe({ email: 'a@b.c', has_password: true, has_google: false })
     ).toBe(true);
     expect(isMe(null)).toBe(false);
     expect(isMe(undefined)).toBe(false);
@@ -73,7 +73,7 @@ describe('auth helpers', () => {
       status: 201,
       json: async () => ({
         statusCode: 201,
-        data: { email: 'a@b.c', has_password: true, has_google: false, remainder: null }
+        data: { email: 'a@b.c', has_password: true, has_google: false }
       })
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -81,7 +81,7 @@ describe('auth helpers', () => {
     await expect(submitCredentials('register', '  A@B.C ', 'twelvechars!!', 'http://app.test')).resolves.toEqual({
       ok: true,
       status: 201,
-      me: { email: 'a@b.c', has_password: true, has_google: false, remainder: null }
+      me: { email: 'a@b.c', has_password: true, has_google: false }
     });
     expect(fetchMock.mock.calls[0][0]).toBe('http://app.test/api/v1/auth/register');
     expect(fetchMock.mock.calls[0][1]).toMatchObject({
@@ -98,7 +98,7 @@ describe('auth helpers', () => {
       status: 200,
       json: async () => ({
         statusCode: 200,
-        data: { email: 'a@b.c', has_password: true, has_google: false, remainder: null }
+        data: { email: 'a@b.c', has_password: true, has_google: false }
       })
     });
     vi.stubGlobal('fetch', loginMock);
@@ -126,7 +126,7 @@ describe('auth helpers', () => {
         status: 199,
         json: async () => ({
           statusCode: 199,
-          data: { email: 'a@b.c', has_password: true, has_google: false, remainder: null }
+          data: { email: 'a@b.c', has_password: true, has_google: false }
         })
       })
     );
@@ -245,7 +245,7 @@ describe('auth helpers', () => {
       status: 200,
       json: async () => ({
         statusCode: 200,
-        data: { email: 'a@b.c', has_password: true, has_google: true, remainder: null }
+        data: { email: 'a@b.c', has_password: true, has_google: true }
       })
     });
     vi.stubGlobal('fetch', setMock);

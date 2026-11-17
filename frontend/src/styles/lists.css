@@ -107,6 +107,12 @@ a.card:focus-visible {
   text-decoration: none;
 }
 
+.section-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+}
+
 .chip-row {
   display: flex;
   flex-wrap: wrap;

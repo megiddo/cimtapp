@@ -1,0 +1,1 @@
+import"../chunks/Bs0rwn6S.js";import{p,a as t,g as a,u as s}from"../chunks/DUji2sbD.js";import{p as i}from"../chunks/BIn0PtUZ.js";import{L as m}from"../chunks/sxEE34-m.js";function c(e,r){p(r,!0);const o=s(()=>i.params.id??"");m(e,{get editId(){return a(o)}}),t()}export{c as component};

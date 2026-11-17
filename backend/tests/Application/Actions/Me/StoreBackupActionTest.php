@@ -53,20 +53,28 @@ class StoreBackupActionTest extends TestCase
         $this->assertNotFalse($before);
         copy($enc, $enc . '.bak');
 
-        $profile = $this->json($app->handle($this->createRequest(
+        $unlocked = $app->handle($this->createRequest(
             'GET',
-            '/api/v1/profiles',
+            '/api/v1/people',
             ['HTTP_ACCEPT' => 'application/json'],
             [AuthConfig::SESSION_COOKIE => $sid],
-        )))['data'][0];
+        ));
+        $this->assertSame(200, $unlocked->getStatusCode());
+        $this->assertNotSame($before, hash_file('sha256', $enc));
+
+        $created = $this->json($app->handle($this->createJsonRequest(
+            'POST',
+            '/api/v1/people',
+            ['name' => 'Noah'],
+            [AuthConfig::SESSION_COOKIE => $sid],
+        )))['data'];
         $renamed = $app->handle($this->createJsonRequest(
             'PATCH',
-            '/api/v1/profiles/' . $profile['id'],
+            '/api/v1/people/' . $created['id'],
             ['name' => 'Pat'],
             [AuthConfig::SESSION_COOKIE => $sid],
         ));
         $this->assertSame(200, $renamed->getStatusCode());
-        $this->assertNotSame($before, hash_file('sha256', $enc));
 
         $available = $app->handle($this->createRequest(
             'GET',
@@ -88,11 +96,11 @@ class StoreBackupActionTest extends TestCase
 
         $after = $this->json($app->handle($this->createRequest(
             'GET',
-            '/api/v1/profiles',
+            '/api/v1/people',
             ['HTTP_ACCEPT' => 'application/json'],
             [AuthConfig::SESSION_COOKIE => $sid],
-        )))['data'][0];
-        $this->assertSame('Default', $after['name']);
+        )))['data'];
+        $this->assertSame([], $after);
     }
 
     public function testBackupRoutesRequireAuth(): void

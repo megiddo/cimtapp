@@ -75,3 +75,7 @@ Plan: [v0.3.md](v0.3.md) — frontend and backend pattern splits, inventory open
 - [x] Milestone 3 — inventory **API/schema** on `0.3.2-backend-inventory`: v7 syringe `archived_at`, `view=all`, syringe archive, `is_open` close-state collapsed. Client fetchers + syringe Archive button landed; sheet/full-list pages stay milestone 1.
 - [x] Leftover splits **done** on `0.3.4-hygiene`: backend Compound/BAC/syringe/use/profile/auth/UserStore extracts; frontend CSS `@layer` + chrome file split.
 
+## Next — v2
+
+Product: [v2.md](v2.md). Orchestrator queue: [v2-checklist.md](v2-checklist.md). Progress log: [v2-milestones.md](v2-milestones.md). Start at **M1** after branch `v2` is committed.
+

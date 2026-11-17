@@ -31,7 +31,7 @@ final class User
     /**
      * Identity for GET /me. Never includes DEK material.
      *
-     * @return array{email: string, has_password: bool, has_google: bool, remainder: null, open_vials: list<empty>}
+     * @return array{email: string, has_password: bool, has_google: bool}
      */
     public function toMeArray(): array
     {

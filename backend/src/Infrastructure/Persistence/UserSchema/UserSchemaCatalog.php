@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Infrastructure\Persistence\UserSchema;
 
 use App\Domain\Auth\IdGenerator;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Ordered strategies that mutate a user sqlite to {@see UserStoreFormat::current()}.
@@ -18,9 +20,10 @@ final class UserSchemaCatalog
     {
     }
 
-    public static function default(?string $migrationsDir = null): self
+    public static function default(?string $migrationsDir = null, ?LoggerInterface $logger = null): self
     {
         $dir = $migrationsDir ?? self::migrationsDirectory();
+        $log = $logger ?? new NullLogger();
 
         return new self(self::ordered([
             new CreateInitialUserSchema($dir),
@@ -30,6 +33,7 @@ final class UserSchemaCatalog
             new AddArchiveAndAdjustments($dir),
             new AddProfiles($dir, new DefaultProfileBackfill(new IdGenerator())),
             new AddSyringeArchive($dir),
+            new AddLogBook($dir, new LogBookMigrationBackfill(), $log),
         ]));
     }
 

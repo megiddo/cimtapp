@@ -9,7 +9,7 @@ final class UserMeMapper
     /**
      * Identity for GET /me. Never includes DEK material.
      *
-     * @return array{email: string, has_password: bool, has_google: bool, remainder: null, open_vials: list<empty>}
+     * @return array{email: string, has_password: bool, has_google: bool}
      */
     public static function fromUser(User $user): array
     {
@@ -17,8 +17,6 @@ final class UserMeMapper
             'email' => $user->email,
             'has_password' => $user->hasPassword(),
             'has_google' => $user->hasGoogle(),
-            'remainder' => null,
-            'open_vials' => [],
         ];
     }
 }

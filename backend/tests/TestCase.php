@@ -180,9 +180,8 @@ class TestCase extends PHPUnit_TestCase
         $this->assertSame($email, $data['email']);
         $this->assertSame($hasPassword, $data['has_password']);
         $this->assertSame($hasGoogle, $data['has_google']);
-        $this->assertArrayHasKey('remainder', $data);
-        $this->assertNull($data['remainder']);
-        $this->assertSame([], $data['open_vials'] ?? null);
+        $this->assertArrayNotHasKey('remainder', $data);
+        $this->assertArrayNotHasKey('open_vials', $data);
         $this->assertArrayNotHasKey('encrypted_dek', $data);
         $this->assertArrayNotHasKey('dek_nonce', $data);
         $this->assertArrayNotHasKey('dek', $data);

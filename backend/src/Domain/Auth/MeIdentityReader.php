@@ -11,7 +11,7 @@ final class MeIdentityReader
     /**
      * Identity snapshot from the unlocked user sqlite (not global DEK columns).
      *
-     * @return array{email: string, has_password: bool, has_google: bool, remainder: null, open_vials: list<empty>}
+     * @return array{email: string, has_password: bool, has_google: bool}
      */
     public function fromUserDb(PDO $pdo): array
     {
@@ -31,8 +31,6 @@ final class MeIdentityReader
             'email' => $row['email'],
             'has_password' => is_string($passwordHash) && $passwordHash !== '',
             'has_google' => is_string($googleSub) && $googleSub !== '',
-            'remainder' => null,
-            'open_vials' => [],
         ];
     }
 }
