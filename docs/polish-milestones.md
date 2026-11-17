@@ -1,0 +1,19 @@
+# PepTrack polish — milestone record
+
+Workers append one section here when a milestone commits. The queue and checkboxes live in [polish-checklist.md](polish-checklist.md).
+
+Do not rewrite an earlier record. Append a new section using:
+
+```markdown
+## P1 — v2.6-inventory
+
+- Branch: `v2.6-inventory`
+- Commit: `<sha>`
+- Version: `v2.6.0`
+- What changed: <one short paragraph>
+- PHPUnit line: <percent> (`composer test`)
+- Vitest line: <percent> (`npm test`)
+- Infection / Stryker: optional — <percent, "not run", or "watchdog timeout">
+- Log-tested branches: v2 M1 lines still pass; no new lines
+- Browser: <what was exercised, or what could not be opened>
+```
