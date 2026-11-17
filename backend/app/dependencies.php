@@ -109,6 +109,7 @@ return function (ContainerBuilder $containerBuilder): void {
                 new \App\Domain\LogBook\VialRepository(),
                 new \App\Domain\LogBook\VialPeopleRepository(),
                 $c->get(VialNamer::class),
+                new \App\Domain\LogBook\AccountSyringeRepository(),
                 $c->get(Clock::class),
             );
         },
@@ -138,6 +139,7 @@ return function (ContainerBuilder $containerBuilder): void {
                 new \App\Domain\LogBook\PersonRepository(),
                 $c->get(DoseCalculator::class),
                 $c->get(VialNamer::class),
+                new \App\Domain\LogBook\AccountSyringeRepository(),
                 $c->get(IdGenerator::class),
                 $c->get(Clock::class),
                 $c->get(LoggerInterface::class),

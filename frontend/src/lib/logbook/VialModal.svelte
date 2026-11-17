@@ -59,7 +59,16 @@
       .filter((name): name is string => name !== undefined)
   );
   const previewName = $derived(
-    selectedPeptide === undefined ? '—' : previewVialName(selectedPeptide.name, selectedNames, mg, bac)
+    selectedPeptide === undefined
+      ? '—'
+      : previewVialName(
+          selectedPeptide.name,
+          selectedNames,
+          mg,
+          bac,
+          syringeVolume ?? 0.5,
+          syringeCapacity ?? 50
+        )
   );
 
   const bottleMg = $derived(parseIuInput(calcMg));
@@ -151,6 +160,7 @@
     title={pepcalcOpen ? 'Peptide calculator' : 'New vial'}
     titleId="vial-modal-title"
     extraClass="calculator"
+    placement={pepcalcOpen ? 'center' : 'bottom'}
     onclose={onclose}
   >
     {#if pepcalcOpen}

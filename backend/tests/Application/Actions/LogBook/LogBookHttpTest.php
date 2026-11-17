@@ -97,7 +97,7 @@ class LogBookHttpTest extends TestCase
             'bac_water_ml' => 2,
             'lid_color_name' => 'Blue',
         ], $sid))['data'];
-        $this->assertSame('Tirzepatide - Noah - 5.00 mg/mL', $solo['display_name']);
+        $this->assertSame('Tirzepatide - Noah - 0.05 mg/IU', $solo['display_name']);
 
         $dual = $this->json($this->authedJson($app, 'POST', '/api/v1/vials', [
             'peptide_id' => 'retatrutide',
@@ -106,7 +106,7 @@ class LogBookHttpTest extends TestCase
             'bac_water_ml' => 1,
             'lid_color_name' => 'Red',
         ], $sid))['data'];
-        $this->assertSame('Retatrutide - Noah, Sam - 10.00 mg/mL', $dual['display_name']);
+        $this->assertSame('Retatrutide - Noah, Sam - 0.10 mg/IU', $dual['display_name']);
 
         $replace = $this->json($this->authedJson($app, 'POST', '/api/v1/vials', [
             'peptide_id' => 'tirzepatide',

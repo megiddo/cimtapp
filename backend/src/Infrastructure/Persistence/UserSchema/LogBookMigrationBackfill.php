@@ -7,6 +7,7 @@ namespace App\Infrastructure\Persistence\UserSchema;
 use App\Domain\Dose\DoseCalculator;
 use App\Domain\Dose\DoseConfig;
 use App\Domain\LogBook\LogBookConfig;
+use App\Domain\LogBook\AccountSyringeRepository;
 use App\Domain\LogBook\VialNamer;
 use PDO;
 
@@ -327,11 +328,14 @@ final class LogBookMigrationBackfill
             $vialRow->execute([':id' => $vialId]);
             $vRow = $vialRow->fetch(PDO::FETCH_ASSOC);
             if (is_array($vRow)) {
+                $syringe = $this->accountSyringe($pdo);
                 $updateName->execute([
                     ':name' => $this->namer->build(
                         (string) $vRow['peptide_name'],
                         $names,
                         (float) $vRow['concentration_mg_per_ml'],
+                        $syringe['volume_ml'],
+                        $syringe['capacity_iu'],
                     ),
                     ':id' => $vialId,
                 ]);
@@ -404,14 +408,25 @@ final class LogBookMigrationBackfill
         if ($names === []) {
             return;
         }
+        $syringe = $this->accountSyringe($pdo);
         $pdo->prepare('UPDATE vials SET display_name = :name WHERE id = :id')->execute([
             ':name' => $this->namer->build(
                 (string) $vRow['peptide_name'],
                 $names,
                 (float) $vRow['concentration_mg_per_ml'],
+                $syringe['volume_ml'],
+                $syringe['capacity_iu'],
             ),
             ':id' => $vialId,
         ]);
+    }
+
+    /**
+     * @return array{volume_ml: float, capacity_iu: float}
+     */
+    private function accountSyringe(PDO $pdo): array
+    {
+        return (new AccountSyringeRepository())->get($pdo);
     }
 
     private function tableHasRows(PDO $pdo, string $table): bool

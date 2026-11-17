@@ -20,7 +20,7 @@ button.text {
   gap: 0.35rem;
 }
 
-.auth-form input,
+.auth-form input:not([type='checkbox']),
 .auth-form select {
   box-sizing: border-box;
   width: 100%;
@@ -29,6 +29,29 @@ button.text {
   border: 1px solid #ccc;
   border-radius: 8px;
   background: #fff;
+}
+
+.auth-form label.check,
+.auth-form .check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.auth-form input[type='checkbox'] {
+  box-sizing: border-box;
+  width: 1.25rem;
+  height: 1.25rem;
+  min-height: auto;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.check-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
 .auth-form button,

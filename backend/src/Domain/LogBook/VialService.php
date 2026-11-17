@@ -28,6 +28,7 @@ final class VialService
         private readonly PersonRepository $people,
         private readonly DoseCalculator $doses,
         private readonly VialNamer $namer,
+        private readonly AccountSyringeRepository $accountSyringe,
         private readonly IdGenerator $ids,
         private readonly Clock $clock,
         private readonly LoggerInterface $logger,
@@ -69,7 +70,14 @@ final class VialService
         foreach ($personIds as $personId) {
             $names[] = (string) ($this->people->find($pdo, $personId)['name'] ?? '');
         }
-        $displayName = $this->namer->build($peptide['name'], $names, $concentration);
+        $syringe = $this->accountSyringe->get($pdo);
+        $displayName = $this->namer->build(
+            $peptide['name'],
+            $names,
+            $concentration,
+            $syringe['volume_ml'],
+            $syringe['capacity_iu'],
+        );
         $id = $this->ids->uuid();
         $now = $this->timestamp();
         $this->vials->insert(

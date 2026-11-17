@@ -17,6 +17,7 @@ final class VialAssignmentService
         private readonly VialRepository $vials,
         private readonly VialPeopleRepository $people,
         private readonly VialNamer $namer,
+        private readonly AccountSyringeRepository $accountSyringe,
         private readonly Clock $clock,
     ) {
     }
@@ -51,6 +52,7 @@ final class VialAssignmentService
             return;
         }
         $names = array_map(static fn (array $r): string => $r['name'], $links);
+        $syringe = $this->accountSyringe->get($pdo);
         $this->vials->updateDisplayName(
             $pdo,
             $vialId,
@@ -58,6 +60,8 @@ final class VialAssignmentService
                 (string) $row['peptide_name'],
                 $names,
                 (float) $row['concentration_mg_per_ml'],
+                $syringe['volume_ml'],
+                $syringe['capacity_iu'],
             ),
         );
     }

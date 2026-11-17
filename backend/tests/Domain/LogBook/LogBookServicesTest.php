@@ -40,6 +40,7 @@ final class LogBookServicesTest extends TestCase
             new \App\Domain\LogBook\VialRepository(),
             new \App\Domain\LogBook\VialPeopleRepository(),
             new VialNamer(),
+            new \App\Domain\LogBook\AccountSyringeRepository(),
             $clock,
         );
         $people = new PersonService($assignment, $ids, $clock);
@@ -68,6 +69,7 @@ final class LogBookServicesTest extends TestCase
             new \App\Domain\LogBook\VialRepository(),
             new \App\Domain\LogBook\VialPeopleRepository(),
             new VialNamer(),
+            new \App\Domain\LogBook\AccountSyringeRepository(),
             $clock,
         );
         $people = new PersonService($assignment, $ids, $clock);
@@ -81,6 +83,7 @@ final class LogBookServicesTest extends TestCase
             new \App\Domain\LogBook\PersonRepository(),
             $doses,
             new VialNamer(),
+            new \App\Domain\LogBook\AccountSyringeRepository(),
             $ids,
             $clock,
             $logger,
@@ -118,6 +121,7 @@ final class LogBookServicesTest extends TestCase
             new \App\Domain\LogBook\VialRepository(),
             new \App\Domain\LogBook\VialPeopleRepository(),
             new VialNamer(),
+            new \App\Domain\LogBook\AccountSyringeRepository(),
             $clock,
         );
         $people = new PersonService($assignment, $ids, $clock);
@@ -131,6 +135,7 @@ final class LogBookServicesTest extends TestCase
             new \App\Domain\LogBook\PersonRepository(),
             $doses,
             new VialNamer(),
+            new \App\Domain\LogBook\AccountSyringeRepository(),
             $ids,
             $clock,
             $logger,
@@ -175,6 +180,7 @@ final class LogBookServicesTest extends TestCase
             new \App\Domain\LogBook\VialRepository(),
             new \App\Domain\LogBook\VialPeopleRepository(),
             new VialNamer(),
+            new \App\Domain\LogBook\AccountSyringeRepository(),
             $clock,
         );
         $people = new PersonService($assignment, $ids, $clock);
@@ -188,6 +194,7 @@ final class LogBookServicesTest extends TestCase
             new \App\Domain\LogBook\PersonRepository(),
             $doses,
             new VialNamer(),
+            new \App\Domain\LogBook\AccountSyringeRepository(),
             $ids,
             $clock,
             $logger,

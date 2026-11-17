@@ -7,6 +7,18 @@
   justify-content: center;
 }
 
+.modal-backdrop.centered {
+  align-items: center;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.modal-backdrop.centered .modal-sheet {
+  border-radius: 16px;
+  max-height: min(90dvh, 760px);
+  overflow-y: auto;
+}
+
 .modal-backdrop-hit {
   position: absolute;
   inset: 0;

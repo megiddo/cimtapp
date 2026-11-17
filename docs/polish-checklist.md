@@ -4,14 +4,14 @@ Source of truth for the branch orchestrator. Product behavior already shipped is
 
 Stack base is branch **`v2.5-cleanup`**. Each next milestone branches from the **tip of the previous milestone**, not from `main`.
 
-**Resume from:** P1 (P0 committed on `v2.6`)
+**Resume from:** P2 (P1 committed on `v2.6-inventory`)
 
 Do not launch P0. P0 is this documentation. The parent commits branch `v2.6` (this file at `docs/polish-checklist.md`, plus an empty record file `docs/polish-milestones.md`) before any worker starts. A worker that finds a dirty tree on its base branch stops with `blocked`. Leave untracked `Untitled/` untracked. Do not `git add -A`.
 
 | # | Milestone | Branch | Base | APP_VERSION | Done |
 | --- | --- | --- | --- | --- | --- |
 | P0 | Plan and orchestrator docs | `v2.6` | `v2.5-cleanup` | unchanged `v2.5.0` | [x] |
-| P1 | Inventory names and modal | `v2.6-inventory` | `v2.6` | `v2.6.0` | [ ] |
+| P1 | Inventory names and modal | `v2.6-inventory` | `v2.6` | `v2.6.0` | [x] |
 | P2 | Log screen | `v2.7-log` | `v2.6-inventory` | `v2.7.0` | [ ] |
 | P3 | Settings trim | `v2.8-settings` | `v2.7-log` | `v2.8.0` | [ ] |
 
@@ -95,12 +95,12 @@ Open Inventory, start a vial, confirm the preview name ends in `mg/IU` and the p
 
 ### Done when
 
-- [ ] New and reassigned vials are named `{Peptide} - {people} - {n} mg/IU`
-- [ ] Person checkboxes are small and labeled
-- [ ] Calculate centers the dialog; closing it restores the bottom sheet
-- [ ] Browser check recorded
-- [ ] `composer test` and `npm test` pass; `APP_VERSION` is `v2.6.0`
-- [ ] Record appended
+- [x] New and reassigned vials are named `{Peptide} - {people} - {n} mg/IU`
+- [x] Person checkboxes are small and labeled
+- [x] Calculate centers the dialog; closing it restores the bottom sheet
+- [x] Browser check recorded
+- [x] `composer test` and `npm test` pass; `APP_VERSION` is `v2.6.0`
+- [x] Record appended
 
 ## P2 — Log screen
 

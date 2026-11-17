@@ -6,7 +6,7 @@ const vial: VialSummary = {
   id: 'v1',
   peptide_id: 'tirzepatide',
   peptide_name: 'Tirzepatide',
-  display_name: 'Tirzepatide - Noah - 5.00 mg/mL',
+  display_name: 'Tirzepatide - Noah - 0.05 mg/IU',
   lid_color_name: 'Blue',
   peptide_mg: 10,
   bac_water_ml: 2,

@@ -17,3 +17,15 @@ Do not rewrite an earlier record. Append a new section using:
 - Log-tested branches: v2 M1 lines still pass; no new lines
 - Browser: <what was exercised, or what could not be opened>
 ```
+
+## P1 — v2.6-inventory
+
+- Branch: `v2.6-inventory`
+- Commit: `2889f0e`
+- Version: `v2.6.0`
+- What changed: Vial display names use mg/IU from account syringe on server and in the modal preview; person checkboxes are compact; Calculate opens a centered modal while the vial sheet stays bottom-aligned.
+- PHPUnit line: 95.66% (`composer test`)
+- Vitest line: 97.38% (`npm test`)
+- Infection / Stryker: not run
+- Log-tested branches: v2 M1 lines still pass; no new lines
+- Browser: not exercised in agent session (local `make up` recommended)

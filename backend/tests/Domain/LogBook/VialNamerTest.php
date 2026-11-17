@@ -13,12 +13,12 @@ final class VialNamerTest extends TestCase
     {
         $namer = new VialNamer();
         $this->assertSame(
-            'Tirzepatide - Noah - 5.00 mg/mL',
-            $namer->build('Tirzepatide', ['Noah'], 5.0),
+            'Tirzepatide - Noah - 0.05 mg/IU',
+            $namer->build('Tirzepatide', ['Noah'], 5.0, 0.5, 50.0),
         );
         $this->assertSame(
-            'Retatrutide - Noah, Sam - 10.00 mg/mL',
-            $namer->build('Retatrutide', ['Noah', 'Sam'], 10.0),
+            'Retatrutide - Noah, Sam - 0.10 mg/IU',
+            $namer->build('Retatrutide', ['Noah', 'Sam'], 10.0, 0.5, 50.0),
         );
     }
 }
